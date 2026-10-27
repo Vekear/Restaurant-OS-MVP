@@ -41,3 +41,6 @@ miniprogram/unpackage/
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# AgentTeams 运行态
+.agent-teams/

@@ -136,6 +136,8 @@ info:
 # ---------------------------------------------------------------------
 app:
   version: 0.1.0-SNAPSHOT
+  # 默认商家（MVP 单商家）：公开菜单/配置缺省使用该店铺
+  default-merchant-id: ${DEFAULT_MERCHANT_ID:1}
 
   cors:
     # Web 前端（Vite dev server）与小程序 H5 调试端口；Spring 使用 pattern 语法
@@ -191,6 +193,10 @@ app:
       - image/jpeg
       - image/png
       - image/webp
+
+  stock:
+    # 低库存预警阈值（stock <= threshold 视为低库存）
+    warn-threshold: ${STOCK_WARN_THRESHOLD:5}
 
   wechat:
     # 无真实 AppID/Secret 时开启 mock，小程序登录走可用的降级通道

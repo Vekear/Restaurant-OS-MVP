@@ -21,6 +21,9 @@ public class AppProperties {
     /** 应用版本，仅用于 OpenAPI / 系统接口展示。 */
     private String version = "0.1.0-SNAPSHOT";
 
+    /** 默认商家 ID（MVP 单商家；公开菜单缺省取该店铺）。 */
+    private Long defaultMerchantId = 1L;
+
     private final Cors cors = new Cors();
 
     private final Jwt jwt = new Jwt();
@@ -40,6 +43,8 @@ public class AppProperties {
     private final Cache cache = new Cache();
 
     private final RateLimit rateLimit = new RateLimit();
+
+    private final Stock stock = new Stock();
 
     private final Task task = new Task();
 
@@ -211,5 +216,13 @@ public class AppProperties {
     public static class Task {
 
         private boolean enabled = true;
+    }
+
+    /** 库存配置。 */
+    @Data
+    public static class Stock {
+
+        /** 低库存预警阈值（stock <= threshold 视为低库存）。 */
+        private int warnThreshold = 5;
     }
 }

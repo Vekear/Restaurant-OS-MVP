@@ -17,7 +17,8 @@ import java.time.Duration;
  * Spring Cache 配置（Redis 实现，key 规则见 {@code docs/01-architecture.md §13}）。
  *
  * <p>缓存名即业务前缀（由 {@code CacheKeys} 常量生成，如 {@code menu:categories}），
- * 实际 Redis key 形如 {@code menu:categories::1}。缓存不可用时由调用方降级直查数据库。
+ * 实际 Redis key 形如 {@code menu:categories:1}（单冒号，对齐 {@code docs/01-architecture.md §13}）。
+ * 缓存不可用时由调用方降级直查数据库。
  */
 @Configuration
 @EnableCaching
@@ -32,7 +33,7 @@ public class CacheConfig {
         RedisCacheConfiguration defaults = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(appProperties.getCache().getMenuTtlMinutes()))
                 .disableCachingNullValues()
-                .computePrefixWith(cacheName -> cacheName + "::")
+                .computePrefixWith(cacheName -> cacheName + ":")
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair

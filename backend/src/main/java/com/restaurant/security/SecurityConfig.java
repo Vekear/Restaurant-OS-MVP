@@ -61,12 +61,11 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/wechat/login").permitAll()
-                        // 公开只读接口：菜单/商家/公共配置/本地文件
+                        // 公开只读接口：菜单/商家/公共配置（文件策略与上传必须登录）
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/menu/**",
                                 "/api/v1/merchants/**",
-                                "/api/v1/public/**",
-                                "/api/v1/files/**").permitAll()
+                                "/api/v1/public/**").permitAll()
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/health/**",

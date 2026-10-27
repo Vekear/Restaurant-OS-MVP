@@ -24,7 +24,7 @@ target/
 .env.local
 .env.*.local
 .runtime/
-storage/
+/storage/
 backend/storage/
 logs/
 *.log

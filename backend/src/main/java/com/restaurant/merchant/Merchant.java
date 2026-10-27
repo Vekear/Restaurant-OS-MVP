@@ -6,10 +6,13 @@ import com.restaurant.common.entity.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 /**
  * 商家表 {@code merchant}：MERCHANT 角色账号的店铺主体。
  *
- * <p>本类当前只映射鉴权所需字段；菜单/订单任务会在此基础上扩展营业状态、配送费等。
+ * <p>公开信息（名称/简介/配送费/起送价等）用于 {@code /merchants/{id}} 与 {@code /public/config}；
+ * 营业状态 OPEN/CLOSED 与审核状态 PENDING/APPROVED/REJECTED 控制店铺可用性。
  */
 @Getter
 @Setter
@@ -20,6 +23,20 @@ public class Merchant extends BaseEntity {
     private Long userId;
 
     private String name;
+
+    private String description;
+
+    private String logoUrl;
+
+    private String phone;
+
+    private String address;
+
+    /** 配送费（元）。 */
+    private BigDecimal deliveryFee;
+
+    /** 起送金额（元）。 */
+    private BigDecimal minOrderAmount;
 
     /** OPEN / CLOSED。 */
     private String businessStatus;

@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
@@ -125,6 +127,18 @@ public class GlobalExceptionHandler {
         log.warn("唯一键冲突: {}", exception.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Result.failure(ErrorCode.UNIQUE_CONFLICT));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Result<Void>> handleMissingPart(MissingServletRequestPartException exception) {
+        return badRequest("缺少必需的文件或参数: " + exception.getRequestPartName());
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Result<Void>> handleMultipart(MultipartException exception) {
+        log.warn("multipart 解析失败: {}", exception.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Result.failure(ErrorCode.FILE_INVALID));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

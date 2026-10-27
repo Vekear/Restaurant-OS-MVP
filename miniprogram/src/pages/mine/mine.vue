@@ -5,15 +5,21 @@
       <view class="profile__glow profile__glow--a"></view>
       <view class="profile__glow profile__glow--b"></view>
       <view class="profile__body">
-        <AppImage
-          :src="avatarUrl"
-          width="120rpx"
-          height="120rpx"
-          radius="50%"
-        />
+        <view class="profile__avatar" @tap="chooseAvatar">
+          <AppImage
+            :src="avatarUrl"
+            width="120rpx"
+            height="120rpx"
+            radius="50%"
+          />
+          <view class="profile__avatar-mask">
+            <text class="profile__avatar-mask-text">{{ uploading ? '上传中' : '更换' }}</text>
+          </view>
+        </view>
         <view class="profile__meta">
           <text class="profile__name">{{ displayName }}</text>
           <text class="profile__desc">{{ isLoggedIn ? '已登录 · 堂食会员' : '登录后可绑定桌台并查看订单进度' }}</text>
+          <text v-if="hasSession" class="profile__table">当前桌台 {{ tableLabel }}</text>
         </view>
         <view class="profile__action" :class="{ 'profile__action--ghost': isLoggedIn }" @tap="onAuthTap">
           {{ isLoggedIn ? '退出' : '登录' }}
@@ -75,17 +81,24 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import AppImage from '@/components/AppImage.vue'
 import { useUserStore } from '@/store/user'
+import { useTableStore } from '@/store/table'
+import { uploadImage, uploadErrorMessage } from '@/api/upload'
+import { updateProfile } from '@/api/profile'
 import { API_BASE_URL, APP_NAME, APP_VERSION, IS_MOCK } from '@/utils/config'
 
-const { isLoggedIn, displayName, state: userState, signOut } = useUserStore()
+const userStore = useUserStore()
+const { isLoggedIn, displayName, state: userState, signOut, updateUser } = userStore
+const tableStore = useTableStore()
+const { hasSession, tableLabel } = tableStore
 
 const isMock = IS_MOCK
 const version = APP_VERSION
 const appName = APP_NAME
 const apiBaseUrl = API_BASE_URL
+const uploading = ref(false)
 
 const avatarUrl = computed(() => {
   const user = userState.user
@@ -110,11 +123,46 @@ function onAuthTap() {
 }
 
 function openOrders() {
-  uni.showToast({ title: '堂食订单将在下一阶段（T17）接入', icon: 'none' })
+  if (!isLoggedIn.value) {
+    uni.navigateTo({ url: '/pages/login/login' })
+    return
+  }
+  uni.navigateTo({ url: '/pages/order/list' })
 }
 
 function openTableSession() {
-  uni.showToast({ title: '扫码绑定桌台将在下一阶段（T17）接入', icon: 'none' })
+  uni.navigateTo({ url: '/pages/scan/scan' })
+}
+
+function chooseAvatar() {
+  if (!isLoggedIn.value) {
+    uni.navigateTo({ url: '/pages/login/login' })
+    return
+  }
+  if (uploading.value) return
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: async (res) => {
+      const filePath = (res.tempFilePaths && res.tempFilePaths[0]) || ''
+      if (!filePath) return
+      uploading.value = true
+      try {
+        // local 模式走 /files/upload（uni.uploadFile）；oss 模式走 PostPolicy 直传 + confirm
+        const file = await uploadImage(filePath, 'avatar')
+        if (!isMock) {
+          await updateProfile({ avatarUrl: file.url })
+        }
+        updateUser({ avatarUrl: file.url })
+        uni.showToast({ title: '头像已更新', icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: uploadErrorMessage(error), icon: 'none', duration: 2400 })
+      } finally {
+        uploading.value = false
+      }
+    }
+  })
 }
 
 function openAbout() {
@@ -174,6 +222,42 @@ function openAbout() {
     flex: 1;
     min-width: 0;
     margin-left: $space-md;
+  }
+
+  &__avatar {
+    position: relative;
+    width: 120rpx;
+    height: 120rpx;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  &__avatar-mask {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 40rpx;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__avatar-mask-text {
+    font-size: 20rpx;
+    color: #ffffff;
+    letter-spacing: 1rpx;
+  }
+
+  &__table {
+    display: inline-block;
+    margin-top: 10rpx;
+    padding: 4rpx 14rpx;
+    border-radius: $radius-pill;
+    background: rgba(255, 255, 255, 0.18);
+    font-size: 20rpx;
+    color: #ffffff;
   }
 
   &__name {

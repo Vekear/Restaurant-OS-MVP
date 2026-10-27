@@ -1,5 +1,6 @@
-import { API_BASE_URL, REQUEST_TIMEOUT, IS_DEV } from '@/utils/config'
+import { API_BASE_URL, API_ORIGIN, REQUEST_TIMEOUT, IS_DEV } from '@/utils/config'
 import { getToken, clearSession } from '@/utils/session'
+import { getTableSessionToken } from '@/utils/tableSession'
 
 const LOGIN_PAGE = '/pages/login/login'
 
@@ -64,6 +65,15 @@ function buildUrl(url) {
   return `${API_BASE_URL}${path}`
 }
 
+/** 将接口路径或后端下发的绝对路径转换为可直接访问的绝对地址（uni.uploadFile 等原生能力需要） */
+export function absoluteUrl(url) {
+  const value = String(url || '')
+  if (/^https?:\/\//i.test(value)) return value
+  // 后端下发的 uploadUrl 已是含 /api/v1 前缀的绝对路径（如 /api/v1/files/upload）
+  if (value.startsWith('/api/')) return `${API_ORIGIN}${value}`
+  return buildUrl(value)
+}
+
 function extractMessage(body, fallback) {
   if (!body) return fallback
   if (typeof body === 'string') return body
@@ -86,6 +96,8 @@ function shouldToast(options) {
  * @param {object} [options.data]     请求数据（GET 时作为 query）
  * @param {object} [options.header]   额外请求头
  * @param {boolean} [options.auth]    是否携带 token，默认 true
+ * @param {boolean} [options.withTableSession] 是否自动携带 X-Table-Session，默认 true
+ * @param {string} [options.idempotencyKey] 幂等键（下单/支付类写操作），非空时写入 Idempotency-Key
  * @param {boolean} [options.silent]  是否静默（不弹错误提示）
  * @param {boolean} [options.loading] 是否展示全局 loading
  * @param {string} [options.loadingText]
@@ -99,6 +111,8 @@ export function request(options = {}) {
     data,
     header = {},
     auth = true,
+    withTableSession = true,
+    idempotencyKey = '',
     silent = false,
     loading = false,
     loadingText = '加载中',
@@ -114,6 +128,13 @@ export function request(options = {}) {
     const token = getToken()
     if (auth && token) {
       finalHeader.Authorization = `Bearer ${token}`
+    }
+    if (withTableSession && !finalHeader['X-Table-Session']) {
+      const sessionToken = getTableSessionToken()
+      if (sessionToken) finalHeader['X-Table-Session'] = sessionToken
+    }
+    if (idempotencyKey) {
+      finalHeader['Idempotency-Key'] = idempotencyKey
     }
 
     if (loading) showLoading(loadingText)

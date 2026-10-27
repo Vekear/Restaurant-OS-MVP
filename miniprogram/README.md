@@ -39,23 +39,35 @@ miniprogram/
    ├─ uni.scss                # 设计变量（品牌色/圆角/阴影/间距）
    ├─ styles/base.scss        # 全局基础样式
    ├─ pages/
-   │  ├─ menu/menu.vue        # 菜单：分类、搜索、图片兜底、加购
-   │  ├─ cart/cart.vue        # 购物车：数量增减、删除、清空、合计
-   │  ├─ mine/mine.vue        # 个人中心：登录态、服务入口、运行环境
-   │  └─ login/login.vue      # 微信登录（uni.login → 后端换 token）
+   │  ├─ menu/menu.vue        # 菜单：分类、搜索、图片兜底、加购、桌台状态条
+   │  ├─ cart/cart.vue        # 购物车：数量增减、删除、清空、去下单
+   │  ├─ mine/mine.vue        # 个人中心：登录态、头像上传、订单入口、运行环境
+   │  ├─ login/login.vue      # 微信登录（uni.login → 后端换 token）
+   │  ├─ scan/scan.vue        # 扫码入座：uni.scanCode / 手输桌号 / 会话卡 / 结束用餐
+   │  └─ order/
+   │     ├─ confirm.vue       # 确认订单：桌台、菜品、备注、金额、提交
+   │     ├─ pay.vue           # 模拟支付：展示真实订单金额，实际扣款 0.01
+   │     ├─ status.vue        # 订单状态：步骤条 + 轮询 + 状态记录 + 取消
+   │     └─ list.vue          # 我的订单：进行中 / 已完成 / 全部
    ├─ components/
    │  ├─ AppImage.vue         # 图片组件（加载失败兜底本地占位图）
    │  ├─ QuantityStepper.vue  # 数量步进器（纯 CSS 图标）
    │  └─ EmptyState.vue       # 空态/错误态
    ├─ api/
-   │  ├─ request.js           # 请求封装：token、401、统一错误、loading、超时
+   │  ├─ request.js           # 请求封装：token、401、统一错误、X-Table-Session、Idempotency-Key
    │  ├─ auth.js              # 登录（真实/mock 双通道）
-   │  └─ menu.js              # 分类与菜品（字段归一化）
+   │  ├─ menu.js              # 分类与菜品（字段归一化）
+   │  ├─ dinein.js            # 扫码/绑定/会话 + 错误码友好文案
+   │  ├─ order.js             # 堂食订单：创建/详情/列表/取消
+   │  ├─ payment.js           # 创建支付单 / 模拟支付
+   │  ├─ upload.js            # 文件策略 + local 上传 / OSS Post Policy 直传
+   │  └─ profile.js           # 资料更新（头像）
    ├─ store/
    │  ├─ user.js              # 登录态（内存 + 本地存储）
-   │  └─ cart.js              # 购物车（本地持久化 + tabBar 角标）
-   ├─ mock/                   # 演示数据（6 分类 / 15 菜 / 假用户）
-   ├─ utils/                  # config / storage / session / format / image
+   │  ├─ cart.js              # 购物车（本地持久化 + tabBar 角标）
+   │  └─ table.js             # 桌台会话（restaurant_mp_table_session_v1）
+   ├─ mock/                   # 演示数据（6 分类 / 15 菜 / 假用户 / 堂食会话与订单）
+   ├─ utils/                  # config / storage / session / format / image / id / qr / tableSession
    └─ static/                 # logo、占位图、tabBar 图标、演示菜品图
 ```
 
@@ -70,6 +82,7 @@ pnpm dev:h5:mock          # 浏览器打开 http://127.0.0.1:5174
 
 # 对接后端开发
 pnpm dev:h5               # H5 开发，/api 反向代理到 http://127.0.0.1:8080
+VITE_PROXY_TARGET=http://127.0.0.1:8090 pnpm dev:h5   # 代理到本地契约桩（8090 专属测试端口）
 pnpm dev:mp-weixin        # 微信开发者工具导入 dist/dev/mp-weixin
 ```
 
@@ -106,8 +119,23 @@ pnpm build:h5:mock     # 演示模式 H5 产物
 | GET | `/menu/categories?merchantId=` | 分类列表 `CategoryView[]`（按 `sort ASC, id ASC`） |
 | GET | `/menu/dishes?merchantId=&categoryId=&keyword=&sort=&page=&size=` | 菜品分页 `PageResult<DishSummaryView>`，`size` 默认 12（1–100），`sort` ∈ `default/price_asc/price_desc/sales_desc` |
 
-后续阶段（T17）将按同一契约接入：
-`POST /dine-in/scan`、`POST /dine-in/bind`、`GET /dine-in/session`（堂食会话，需请求头 `X-Table-Session`）、`POST /dine-in/orders`、`POST /payments`、`POST /payments/{payNo}/mock-pay`（以上下单/支付接口须带 `Idempotency-Key`）、`GET /files/policy`、`POST /files/upload`、`POST /files/confirm`。
+堂食链路（T17，已接入同一契约）：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/dine-in/scan` | 入参 `{ p, s }`，校验二维码签名，返回 `DineInSessionView` |
+| POST | `/dine-in/bind` | 入参 `{ tableNo, s? }`（手输桌号兜底），返回 `DineInSessionView` |
+| GET | `/dine-in/session` | 请求头 `X-Table-Session`，返回当前会话（无则 40401） |
+| POST | `/dine-in/session/close` | 结束用餐（有进行中订单时 40916） |
+| POST | `/dine-in/orders` | 下单：`X-Table-Session` + `Idempotency-Key`，body `{ items[{dishId,quantity}], remark, expectedPayAmount }` |
+| GET | `/dine-in/orders?statusGroup=ACTIVE\|FINISHED\|ALL` | 我的订单分页 |
+| GET | `/dine-in/orders/{id}` | 订单详情（状态页轮询此接口） |
+| POST | `/dine-in/orders/{id}/cancel` | 取消订单（待支付/待接单可取消） |
+| POST | `/payments` | 创建支付单 `{ orderId, orderType }`（`Idempotency-Key`），返回 `paidAmount = min(0.01, orderAmount)` |
+| POST | `/payments/{payNo}/mock-pay` | 模拟支付（`Idempotency-Key`），返回 `PaymentView` |
+| GET | `/files/policy?bizType=&ext=` | 文件策略：`local`（`uploadMode=backend`）或 `oss`（Post Policy） |
+| POST | `/files/upload` | local 模式 `uni.uploadFile` 表单上传（`file`、`bizType`） |
+| POST | `/files/confirm` | oss 直传后回执确认 |
 
 字段归一化：分类 `id/name/sort/dishCount/status`；菜品 `id/name/categoryId/categoryName/price/originalPrice/imageUrl/stock/sales/status/soldOut/tags`（兼容 `image/coverUrl` 等历史命名）；`fetchDishes` 返回归一化后的 `PageResult`，页内渲染只需 `.list`。
 
@@ -119,6 +147,12 @@ pnpm build:h5:mock     # 演示模式 H5 产物
 - **图片兜底**：`AppImage.vue` 统一处理相对路径与绝对地址；加载失败自动切换 `static/placeholder.png`；后端 `storage.type=local` 时 `/files/**` 会拼上源站地址。
 - **购物车**：模块级 reactive + `uni.setStorageSync` 持久化（key `restaurant_mp_cart_v1`），单菜上限 99 份；数量变化同步 tabBar 角标，首次启动 tabBar 未挂载时自动重试（最多 3 次），避免首屏角标丢失。
 - **登录态**：token 与用户信息存于本地存储（`restaurant_mp_token` / `restaurant_mp_user`），启动时恢复；退出登录清除缓存。
+- **桌台会话**（`store/table.js` + `utils/tableSession.js`）：绑定成功后持久化 `DineInSessionView`；`request.js` 对后续请求自动附加 `X-Table-Session`；会话过期（`expireAt`）或 40911 时提示重新扫码。
+- **扫码入座**（`pages/scan/scan.vue`）：`uni.scanCode` 解析小程序码/二维码中的 `p`、`s` 参数 → `POST /dine-in/scan`；无相机环境（H5）提供手输桌号 `POST /dine-in/bind` 兜底；错误码 40004/40910/40917 等映射为中文提示；已入座显示桌号、商家、到期时间与「结束用餐」。
+- **下单与幂等**：确认页提交前生成一次 `Idempotency-Key`（`utils/id.js`）并在重试时复用；`expectedPayAmount` 传真实应付金额，后端金额变化返回 40005 时提示刷新；成功后清空购物车并跳转支付页。
+- **模拟支付**：支付页展示 `orders.pay_amount` 真实金额，明确提示「实际扣款 ¥0.01（演示环境），报表按订单金额统计」；调用 `/payments/{payNo}/mock-pay` 后进入状态页。
+- **状态页轮询**：默认每 5 秒轮询 `GET /dine-in/orders/{id}`（小程序 WebSocket 可用时由后续阶段接入，轮询作为兜底）；页面隐藏/卸载时停止定时器；支持下拉刷新、取消订单、查看状态流转记录。
+- **图片上传**（`api/upload.js`）：读取 `/files/policy`；`storageType=local` 时用 `uni.uploadFile` 直传后端再回填 URL，`storageType=oss` 时按 Post Policy 表单直传 OSS 后调用 `/files/confirm`；`AppImage` 对失败图片兜底本地占位图。
 - **无 TypeScript**：全部 `.js` + `<script setup>`，`jsconfig.json` 仅用于编辑器识别 `@/` 别名（`allowJs`、`checkJs: false`）。
 
 ## 7. 验证记录（真实执行）
@@ -207,12 +241,47 @@ SMOKE_PASS: 菜单卡片 15 张 | 分类标签 7 个（含全部） | 无横向�
 
 - **微信小程序真机/开发者工具运行**：本机未安装微信开发者工具，且无微信 AppID → 「未验证」。
 - **真实微信登录换取 openid**：无 AppID/Secret，仅验证 mock 链路 → 真实链路「未验证」。
-- **与后端联调**（`/auth/wx/login`、`/menu/*`）：后端尚未交付，接口按约定封装 → 「未验证」。
-- **扫码入座、下单、模拟支付、状态轮询、图片上传**：属于 T17 范围，本阶段未实现。
+- **与真实后端联调**（`/menu/*`、`/dine-in/*`、`/payments/*`）：后端堂食接口尚在 T08/T09 排队，本阶段用契约桩验证 → 「未验证」。
+- **微信/支付宝真实支付**：仅实现 `mock-pay` → 真实支付「未验证」。
+- **OSS 直传**：本机无阿里云 OSS 凭证，仅验证 local 上传分支 → OSS 分支「未验证」。
 
-## 8. 后续（T17 预告，不在本阶段范围）
+### 7.8 T17 堂食链路验证（H5 + 契约桩，端口 8090）
 
-`uni.scanCode` 解析桌台二维码 → `/dine-in/bind` 绑定会话 → 下单（`Idempotency-Key`）→ 模拟支付 → 订单状态页（轮询/WebSocket）→ 图片上传（local 走 `uni.uploadFile`，OSS 走 Post Policy 表单直传）。
+> 8080 固定留给真实 Spring Boot 后端；本次验证的临时桩服务监听 8090，脚本未纳入仓库，验证结束后已关闭（`netstat -ano | findstr :8090` 无 LISTENING）。
+
+启动方式：
+
+```bash
+VITE_PROXY_TARGET=http://127.0.0.1:8090 pnpm dev:h5   # 代理到本地契约桩
+# 另一个终端：node <临时目录>/t17/stub.cjs           # 契约桩，监听 8090
+```
+
+浏览器端到端（Chrome Headless 9335 + CDP，视口 390×844，`Network.setCacheDisabled`）：
+
+| 步骤 | 断言结果 |
+| --- | --- |
+| 登录 | `POST /api/v1/auth/wechat/login` → 写入 `real-token-from-stub`，跳转菜单 |
+| 扫码/手输入座 | 手输 `A01` → `POST /api/v1/dine-in/bind` → 会话持久化；菜单顶部显示「A01 · 桩服务桌台」 |
+| 加购 | 菜品卡片「+」→ 购物车 2 件、合计 `120.00`、tabBar 角标同步 |
+| 确认订单 | 桌台条、菜品明细、备注、金额 `120.00`；提交前 `expectedPayAmount` 一致 |
+| 下单 | `POST /api/v1/dine-in/orders`，请求头含 `X-Table-Session` 与 `Idempotency-Key: dinein-order-*` |
+| 支付页 | 展示真实金额 `120.00`，提示「实际扣款 ¥0.01（演示环境），报表按订单金额统计」；倒计时 14:58 |
+| 模拟支付 | `POST /api/v1/payments` + `POST /api/v1/payments/P8801/mock-pay`，均带 `Idempotency-Key` |
+| 状态轮询 | 依次观察到 `已接单 → 制作中 → 已出餐 → 已完成`（每 5 秒轮询），状态记录 6 条 |
+| 我的订单 | 「进行中」0 条、「已完成」1 条（`已完成`） |
+| 桌台冲突 | 手输 `A99` → 弹窗「桌台已被占用，请联系服务员」（40910） |
+| 图片上传 | 个人中心头像 → `GET /files/policy` → `POST /files/upload`（`uni.uploadFile`）→ `PUT /auth/profile`，toast「头像已更新」 |
+| 控制台错误 | 0 条 |
+
+截图（临时目录，未入库）：菜单入座态、确认订单、支付页、已完成状态页、订单列表、扫码空态/冲突弹窗。
+
+构建：`pnpm build:mp-weixin`、`pnpm build:h5` 均 `DONE Build complete`（见 7.2/7.3）。
+
+## 8. 后续（T18+ 预告，不在本阶段范围）
+
+- 小程序端 WebSocket 订阅订单状态（轮询保留为兜底）。
+- 优惠券选择、订单评价、发票等营销能力。
+- 真机扫码与微信开发者工具联调（需真实 AppID 与后端堂食接口）。
 
 ## 9. 常见问题
 

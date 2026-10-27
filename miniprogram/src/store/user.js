@@ -36,13 +36,21 @@ function syncFromStorage() {
   state.user = getUser()
 }
 
+/** 局部更新用户资料（头像、昵称等），并持久化 */
+function updateUser(patch) {
+  if (!patch || typeof patch !== 'object') return
+  state.user = Object.assign({}, state.user || {}, patch)
+  setUser(state.user)
+}
+
 const userStore = {
   state,
   isLoggedIn,
   displayName,
   signIn,
   signOut,
-  syncFromStorage
+  syncFromStorage,
+  updateUser
 }
 
 export function useUserStore() {

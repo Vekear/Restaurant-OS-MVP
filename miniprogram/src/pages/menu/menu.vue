@@ -19,6 +19,14 @@
         </view>
       </view>
 
+      <view class="session-bar" @tap="goScan">
+        <view class="session-bar__dot" :class="{ 'session-bar__dot--off': !hasSession }"></view>
+        <text class="session-bar__text">
+          {{ hasSession ? `${tableLabel} · ${merchantName}` : '未绑定桌台，点击扫码入座后即可下单' }}
+        </text>
+        <text class="session-bar__action">{{ hasSession ? '换桌' : '去扫码' }} ›</text>
+      </view>
+
       <view class="search">
         <view class="search__icon">
           <view class="search__icon-circle"></view>
@@ -143,15 +151,18 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import AppImage from '@/components/AppImage.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import QuantityStepper from '@/components/QuantityStepper.vue'
 import { fetchCategories, fetchDishes } from '@/api/menu'
 import { useCartStore } from '@/store/cart'
+import { useTableStore } from '@/store/table'
 import { formatAmount } from '@/utils/format'
 
 const cartStore = useCartStore()
+const tableStore = useTableStore()
+const { hasSession, tableLabel, merchantName } = tableStore
 
 const categories = ref([])
 const dishes = ref([])
@@ -228,6 +239,10 @@ function goCart() {
   uni.switchTab({ url: '/pages/cart/cart' })
 }
 
+function goScan() {
+  uni.navigateTo({ url: '/pages/scan/scan' })
+}
+
 watch(keyword, () => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
@@ -238,6 +253,11 @@ watch(keyword, () => {
 onLoad(() => {
   loadCategories()
   loadDishes()
+})
+
+onShow(() => {
+  // 从扫码/登录页返回时同步本地会话（桌台状态 chip 实时刷新）
+  tableStore.syncFromStorage()
 })
 
 onPullDownRefresh(() => {
@@ -338,6 +358,46 @@ onPullDownRefresh(() => {
     margin-top: 6rpx;
     font-size: $font-sm;
     color: rgba(255, 255, 255, 0.86);
+  }
+}
+
+/* ---------- 桌台状态条 ---------- */
+.session-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  margin-top: $space-md;
+  padding: 14rpx $space-md;
+  border-radius: $radius-pill;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.25);
+
+  &__dot {
+    width: 12rpx;
+    height: 12rpx;
+    margin-right: 12rpx;
+    border-radius: 50%;
+    background: #7cf29c;
+    box-shadow: 0 0 10rpx rgba(124, 242, 156, 0.9);
+
+    &--off {
+      background: #ffd166;
+      box-shadow: 0 0 10rpx rgba(255, 209, 102, 0.9);
+    }
+  }
+
+  &__text {
+    flex: 1;
+    font-size: $font-xs;
+    color: rgba(255, 255, 255, 0.94);
+  }
+
+  &__action {
+    margin-left: $space-sm;
+    font-size: $font-xs;
+    font-weight: 700;
+    color: #ffffff;
   }
 }
 

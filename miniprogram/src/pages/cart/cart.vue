@@ -11,10 +11,13 @@
     <template v-else>
       <view class="summary">
         <view class="summary__left">
-          <text class="summary__title">小馆食堂 · 堂食</text>
+          <text class="summary__title">{{ merchantName }} · 堂食</text>
           <text class="summary__desc">共 {{ totalQuantity }} 件商品</text>
         </view>
-        <view class="summary__clear" @tap="confirmClear">清空</view>
+        <view class="summary__right">
+          <view class="summary__table" @tap="goScan">{{ hasSession ? `${tableLabel} 桌` : '未入座 · 去扫码' }}</view>
+          <view class="summary__clear" @tap="confirmClear">清空</view>
+        </view>
       </view>
 
       <view class="list">
@@ -65,10 +68,16 @@ import AppImage from '@/components/AppImage.vue'
 import QuantityStepper from '@/components/QuantityStepper.vue'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
+import { useTableStore } from '@/store/table'
 import { formatAmount } from '@/utils/format'
 
 const { items, totalQuantity, totalAmount, increase, decrease, removeItem, clearCart } = useCartStore()
 const { isLoggedIn } = useUserStore()
+const { hasSession, tableLabel, merchantName } = useTableStore()
+
+function goScan() {
+  uni.navigateTo({ url: '/pages/scan/scan' })
+}
 
 function goMenu() {
   uni.switchTab({ url: '/pages/menu/menu' })
@@ -103,13 +112,19 @@ function checkout() {
     })
     return
   }
-  uni.showModal({
-    title: '堂食下单',
-    content: `共 ${totalQuantity.value} 件，合计 ¥${formatAmount(totalAmount.value)}。\n下单与支付将在下一阶段（T17）接入，当前为菜单/购物车骨架。`,
-    showCancel: false,
-    confirmText: '我知道了',
-    confirmColor: '#FF6B35'
-  })
+  if (!hasSession.value) {
+    uni.showModal({
+      title: '请先扫码入座',
+      content: '堂食下单需要先绑定桌台，扫描桌角二维码即可',
+      confirmText: '去扫码',
+      confirmColor: '#FF6B35',
+      success: (res) => {
+        if (res.confirm) goScan()
+      }
+    })
+    return
+  }
+  uni.navigateTo({ url: '/pages/order/confirm' })
 }
 </script>
 
@@ -137,6 +152,21 @@ function checkout() {
     margin-top: 6rpx;
     font-size: $font-xs;
     color: $color-text-muted;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+  }
+
+  &__table {
+    margin-right: $space-sm;
+    padding: 10rpx $space-md;
+    border-radius: $radius-pill;
+    background: #fff1e9;
+    font-size: $font-xs;
+    font-weight: 600;
+    color: $color-brand-dark;
   }
 
   &__clear {

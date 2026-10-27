@@ -17,7 +17,7 @@
  *   3. 敏感键被硬编码字面量：JWT_SECRET / TABLE_QR_SECRET / DB_PASSWORD /
  *      MYSQL_ROOT_PASSWORD / ACCESS_KEY_SECRET / WECHAT_APP_SECRET 等，
  *      以及通用键 password / secret / token / api_key / access_key（阈值见
- *      MIN_LENGTH_BY_KIND）
+ *      minLengthFor(normalizedKey)）
  *
  * 放行（不算违规，--verbose 可查看明细）：
  *   - .env.example / *.env.example（契约要求只放占位值，按 T19a 契约放行）
@@ -258,12 +258,13 @@ function evaluateLiteral(rawValue, normalizedKey) {
   return { allowed: true, reason: `too-short(<${minLength})` };
 }
 
-function lineAt(text, index) {
-  let line = 1;
-  for (let i = 0; i < index; i += 1) {
-    if (text.charCodeAt(i) === 10) line += 1;
-  }
-  return line;
+/** 无引号右值是否为表达式/属性访问（不是字面量） */
+function isExpressionLike(value) {
+  // JWT 形如 eyJ...x.y.z，无引号时也可能出现在 YAML/日志里，按字面量处理
+  if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(value)) return false;
+  // 正则/模式常量：/.../ 或包含正则元字符
+  if (value.startsWith('/')) return true;
+  return /[()[\]{}<>=+*|&!?,]/.test(value) || value.includes('.') || /\s/.test(value);
 }
 
 function recordExemption(file, line, detail) {
@@ -296,13 +297,22 @@ function scanLine(lineText, lineNo, relPath) {
   }
 
   const seen = new Set();
-  const inspect = (rawKey, rawValue) => {
+  const inspect = (rawKey, rawValue, quoted) => {
     if (!rawKey || rawValue === undefined) return;
     const normalizedKey = normalizeKey(rawKey);
     if (!isSecretKey(normalizedKey)) return;
     const dedupeKey = `${normalizedKey}|${rawValue}`;
     if (seen.has(dedupeKey)) return;
     seen.add(dedupeKey);
+
+    if (!quoted && isExpressionLike(String(rawValue))) {
+      recordExemption(
+        relPath,
+        lineNo,
+        `敏感键 ${rawKey} 右值为表达式/引用（非字面量，第 ${lineNo} 行）`,
+      );
+      return;
+    }
 
     const verdict = evaluateLiteral(rawValue, normalizedKey);
     if (verdict.allowed) {
@@ -322,10 +332,12 @@ function scanLine(lineText, lineNo, relPath) {
   };
 
   for (const match of lineText.matchAll(ASSIGN_RE)) {
-    inspect(match[1], match[2] ?? match[3] ?? match[4] ?? match[5]);
+    const quoted = match[2] !== undefined || match[3] !== undefined || match[4] !== undefined;
+    inspect(match[1], match[2] ?? match[3] ?? match[4] ?? match[5], quoted);
   }
   for (const match of lineText.matchAll(COLON_RE)) {
-    inspect(match[1] ?? match[2] ?? match[3], match[4] ?? match[5] ?? match[6] ?? match[7]);
+    const quoted = match[4] !== undefined || match[5] !== undefined || match[6] !== undefined;
+    inspect(match[1] ?? match[2] ?? match[3], match[4] ?? match[5] ?? match[6] ?? match[7], quoted);
   }
 }
 

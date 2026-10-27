@@ -1,0 +1,6 @@
+# node_modules/ 已由根 .gitignore 覆盖，此处补充 E2E 本地产物（双保险）
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+.cache/

@@ -48,6 +48,8 @@ public class AppProperties {
 
     private final Stock stock = new Stock();
 
+    private final Report report = new Report();
+
     private final Task task = new Task();
 
     /** 跨域配置（仅开发环境放行 Vite dev server）。 */
@@ -178,8 +180,17 @@ public class AppProperties {
         /** 桌台二维码 HMAC-SHA256 签名密钥，生产通过 TABLE_QR_SECRET 注入。 */
         private String qrSecret = "";
 
-        /** 会话有效期（分钟）。 */
-        private int sessionExpireMinutes = 120;
+        /** 二维码落地页地址（小程序/H5 扫码后进入的页面，携带 p/s/t 参数）。 */
+        private String qrBaseUrl = "http://localhost/dine-in";
+
+        /** 是否允许手输桌号开桌（关闭后只能扫码）。 */
+        private boolean allowManualInput = true;
+
+        /** 二维码签名有效期（天），0 表示不校验时间窗口。 */
+        private int qrValidityDays = 365;
+
+        /** 会话空闲有效期（分钟）。 */
+        private int sessionIdleTimeoutMinutes = 120;
 
         /** 会话清理 cron（默认每 5 分钟）。 */
         private String sessionCleanupCron = "0 */5 * * * ?";
@@ -229,6 +240,14 @@ public class AppProperties {
     public static class Task {
 
         private boolean enabled = true;
+    }
+
+    /** 报表配置。 */
+    @Data
+    public static class Report {
+
+        /** 统计/导出的最大查询区间（天），对应 docs/01-architecture.md §16.9。 */
+        private int maxRangeDays = 92;
     }
 
     /** 库存配置。 */

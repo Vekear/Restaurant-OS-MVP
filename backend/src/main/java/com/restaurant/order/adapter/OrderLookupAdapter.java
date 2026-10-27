@@ -1,6 +1,7 @@
 package com.restaurant.order.adapter;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.restaurant.common.enums.OrderStatus;
 import com.restaurant.contract.OrderLookupPort;
 import com.restaurant.order.Order;
 import com.restaurant.order.OrderItem;
@@ -38,5 +39,29 @@ public class OrderLookupAdapter implements OrderLookupPort {
                 .stream()
                 .map(OrderItem::getDishName)
                 .toList();
+    }
+
+    @Override
+    public Long activeOrderIdBySession(Long sessionId) {
+        Order order = orderMapper.selectOne(Wrappers.<Order>lambdaQuery()
+                .eq(Order::getTableSessionId, sessionId)
+                .in(Order::getStatus, OrderStatus.dineInActiveStatuses())
+                .orderByDesc(Order::getId)
+                .last("LIMIT 1"));
+        return order == null ? null : order.getId();
+    }
+
+    @Override
+    public boolean hasActiveOrderForSession(Long sessionId) {
+        return orderMapper.selectCount(Wrappers.<Order>lambdaQuery()
+                .eq(Order::getTableSessionId, sessionId)
+                .in(Order::getStatus, OrderStatus.dineInActiveStatuses())) > 0;
+    }
+
+    @Override
+    public boolean hasActiveOrderForTable(Long tableId) {
+        return orderMapper.selectCount(Wrappers.<Order>lambdaQuery()
+                .eq(Order::getTableId, tableId)
+                .in(Order::getStatus, OrderStatus.dineInActiveStatuses())) > 0;
     }
 }

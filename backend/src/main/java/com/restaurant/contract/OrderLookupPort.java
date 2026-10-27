@@ -21,6 +21,31 @@ public interface OrderLookupPort {
      */
     List<String> dishNames(Long orderId);
 
+
+    /**
+     * 查询会话下进行中订单 ID（无则返回 {@code null}）。
+     *
+     * @param sessionId 桌台会话 ID
+     * @return 进行中订单 ID
+     */
+    Long activeOrderIdBySession(Long sessionId);
+
+    /**
+     * 会话是否存在进行中订单（PENDING_PAYMENT/PAID/ACCEPTED/MAKING/SERVED）。
+     *
+     * @param sessionId 桌台会话 ID
+     * @return 存在返回 {@code true}
+     */
+    boolean hasActiveOrderForSession(Long sessionId);
+
+    /**
+     * 桌台是否存在进行中订单。
+     *
+     * @param tableId 桌台 ID
+     * @return 存在返回 {@code true}
+     */
+    boolean hasActiveOrderForTable(Long tableId);
+
     /**
      * 订单摘要。
      *

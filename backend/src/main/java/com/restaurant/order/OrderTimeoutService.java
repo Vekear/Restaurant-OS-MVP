@@ -3,6 +3,7 @@ package com.restaurant.order;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.restaurant.common.enums.OrderStatus;
 import com.restaurant.contract.OrderTimeoutPort;
+import com.restaurant.contract.TableReleasePort;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.statemachine.OrderOperator;
 import com.restaurant.order.statemachine.OrderStateMachine;
@@ -30,6 +31,8 @@ public class OrderTimeoutService implements OrderTimeoutPort {
 
     private final OrderSideEffectService orderSideEffectService;
 
+    private final TableReleasePort tableReleasePort;
+
     private final TransactionTemplate transactionTemplate;
 
     @Override
@@ -53,6 +56,9 @@ public class OrderTimeoutService implements OrderTimeoutPort {
                     orderSideEffectService.restoreStock(order);
                     orderSideEffectService.restoreCoupon(order);
                     orderSideEffectService.closeUnpaid(order.getId());
+                    if (order.getTableId() != null && order.getTableSessionId() != null) {
+                        tableReleasePort.release(order.getTableId(), order.getTableSessionId());
+                    }
                     return true;
                 } catch (RuntimeException e) {
                     log.error("订单超时取消失败 orderId={}", order.getId(), e);

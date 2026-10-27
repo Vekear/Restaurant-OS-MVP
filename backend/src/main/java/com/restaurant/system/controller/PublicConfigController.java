@@ -49,7 +49,8 @@ public class PublicConfigController {
                 new PublicConfigView.MockPayment(true,
                         appProperties.getPayment().getMockChargeAmount(), CURRENCY, MOCK_PAYMENT_HINT),
                 new PublicConfigView.Order(appProperties.getOrder().getPaymentTimeoutMinutes()),
-                new PublicConfigView.Table(appProperties.getTable().getSessionExpireMinutes(), true),
+                new PublicConfigView.Table(appProperties.getTable().getSessionIdleTimeoutMinutes(),
+                        appProperties.getTable().isAllowManualInput()),
                 new PublicConfigView.Storage(fileStorageFacade.type(), fileStorageFacade.uploadMode(),
                         fileStorageFacade.maxSizeMb(), allowedTypes),
                 new PublicConfigView.Websocket(ApiConstants.WS_ENDPOINT, ApiConstants.WS_NATIVE_ENDPOINT, 10));

@@ -173,7 +173,10 @@ app:
   table:
     # 桌台二维码 HMAC-SHA256 签名密钥，生产必须通过 TABLE_QR_SECRET 覆盖
     qr-secret: ${TABLE_QR_SECRET:restaurant-mvp-dev-only-table-qr-secret-0123456789}
-    session-expire-minutes: ${TABLE_SESSION_EXPIRE_MINUTES:120}
+    qr-base-url: ${TABLE_QR_BASE_URL:http://localhost/dine-in}
+    allow-manual-input: ${TABLE_ALLOW_MANUAL_INPUT:true}
+    qr-validity-days: ${TABLE_QR_VALIDITY_DAYS:365}
+    session-idle-timeout-minutes: ${TABLE_SESSION_IDLE_TIMEOUT_MINUTES:120}
     session-cleanup-cron: ${TABLE_SESSION_CLEANUP_CRON:0 */5 * * * ?}
 
   storage:
@@ -197,6 +200,10 @@ app:
       - image/jpeg
       - image/png
       - image/webp
+
+  report:
+    # 统计/导出最大查询区间（天）
+    max-range-days: ${REPORT_MAX_RANGE_DAYS:92}
 
   stock:
     # 低库存预警阈值（stock <= threshold 视为低库存）

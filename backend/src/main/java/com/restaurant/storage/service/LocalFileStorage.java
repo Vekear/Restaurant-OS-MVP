@@ -113,6 +113,62 @@ public class LocalFileStorage implements FileStorageService {
     }
 
     @Override
+    public FileObjectView storeBytes(byte[] bytes, String contentType, String originalName,
+                                     String bizType, Long uploaderId) {
+        String normalizedBizType = FileValidation.requireAnyBizType(bizType);
+        if (bytes == null || bytes.length == 0) {
+            throw new BizException(ErrorCode.FILE_INVALID, "文件内容不能为空");
+        }
+        long maxBytes = appProperties.getUpload().getMaxSize().toBytes();
+        if (bytes.length > maxBytes) {
+            throw new BizException(ErrorCode.FILE_INVALID, "文件不能超过 " + maxSizeMb() + "MB");
+        }
+        String normalizedType = FileValidation.normalizeContentType(contentType);
+        List<String> allowedTypes = allowedContentTypes();
+        if (!allowedTypes.contains(normalizedType)) {
+            throw new BizException(ErrorCode.FILE_INVALID, "仅支持 " + String.join("、", allowedTypes));
+        }
+        FileValidation.verifyMagicNumber(bytes, normalizedType);
+        String extension = FileValidation.extensionForContentType(normalizedType);
+        String objectKey = normalizedBizType + "/" + FileValidation.monthPath() + "/"
+                + FileValidation.uuid() + "." + extension;
+        Path root = localRoot();
+        Path target = root.resolve(objectKey).normalize();
+        if (!target.startsWith(root)) {
+            throw new BizException(ErrorCode.FILE_INVALID, "非法的对象键");
+        }
+        try {
+            Files.createDirectories(target.getParent());
+            Files.write(target, bytes);
+        } catch (IOException e) {
+            log.error("写入本地文件失败, objectKey={}", objectKey, e);
+            throw new BizException(ErrorCode.STORAGE_ERROR, "文件保存失败，请重试");
+        }
+        FileObject fileObject = new FileObject();
+        fileObject.setBizType(normalizedBizType);
+        fileObject.setObjectKey(objectKey);
+        fileObject.setUrl(FileValidation.normalizeUrlPrefix(appProperties.getStorage().getLocal().getUrlPrefix())
+                + "/" + objectKey);
+        fileObject.setOriginalName(safeOriginalName(originalName));
+        fileObject.setContentType(normalizedType);
+        fileObject.setSize((long) bytes.length);
+        fileObject.setStorageType("local");
+        fileObject.setUploaderId(uploaderId);
+        try {
+            fileObjectMapper.insert(fileObject);
+        } catch (RuntimeException e) {
+            try {
+                Files.deleteIfExists(target);
+            } catch (IOException cleanupError) {
+                log.warn("回滚本地文件失败, objectKey={}", objectKey, cleanupError);
+            }
+            throw e;
+        }
+        log.info("本地文件已保存(服务端生成), objectKey={}, size={}", objectKey, bytes.length);
+        return toView(fileObject);
+    }
+
+    @Override
     public FilePolicyView policy(String bizType, String ext) {
         FileValidation.requireAnyBizType(bizType);
         FileValidation.requireExtension(ext);

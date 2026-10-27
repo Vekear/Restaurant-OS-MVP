@@ -2,6 +2,7 @@ package com.restaurant.audit;
 
 import com.restaurant.audit.mapper.AuditLogMapper;
 import com.restaurant.common.log.TraceContext;
+import com.restaurant.security.UserPrincipal;
 import com.restaurant.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,24 @@ public class AuditService {
     public void profileUpdated(User user, String detail, String ip, String userAgent) {
         record(user.getId(), user.getUsername(), user.getRole(), AuditActions.PROFILE_UPDATE,
                 "USER", String.valueOf(user.getId()), detail, ip, userAgent, true);
+    }
+
+    /**
+     * 通用业务审计（桌台/订单等），失败不影响主流程。
+     *
+     * @param principal  当前登录用户（系统任务可为 {@code null}）
+     * @param action     动作常量
+     * @param targetType 目标类型（TABLE/ORDER/...）
+     * @param targetId   目标 ID
+     * @param detail     摘要（禁止敏感信息）
+     * @param success    是否成功
+     */
+    public void event(UserPrincipal principal, String action, String targetType, String targetId,
+                      String detail, boolean success) {
+        record(principal == null ? null : principal.getId(),
+                principal == null ? null : principal.getUsername(),
+                principal == null ? null : principal.getRole(),
+                action, targetType, targetId, detail, null, null, success);
     }
 
     private void record(Long userId,

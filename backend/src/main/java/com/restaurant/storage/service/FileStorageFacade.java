@@ -76,6 +76,12 @@ public class FileStorageFacade implements FileStorageService {
     }
 
     @Override
+    public FileObjectView storeBytes(byte[] bytes, String contentType, String originalName,
+                                     String bizType, Long uploaderId) {
+        return delegate.storeBytes(bytes, contentType, originalName, bizType, uploaderId);
+    }
+
+    @Override
     public FilePolicyView policy(String bizType, String ext) {
         return delegate.policy(bizType, ext);
     }

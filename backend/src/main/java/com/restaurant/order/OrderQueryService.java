@@ -31,10 +31,17 @@ public class OrderQueryService {
 
     @Transactional(readOnly = true)
     public PageResult<OrderView> list(Long userId, String statusGroup, String status, int page, int size) {
+        return listByType(userId, OrderType.TAKEOUT, statusGroup, status, page, size);
+    }
+
+    /** 按订单类型分页查询（外卖/堂食），ACTIVE 状态集合随类型不同。 */
+    @Transactional(readOnly = true)
+    public PageResult<OrderView> listByType(Long userId, OrderType orderType,
+                                            String statusGroup, String status, int page, int size) {
         LambdaQueryWrapper<Order> query = Wrappers.<Order>lambdaQuery()
                 .eq(Order::getUserId, userId)
-                .eq(Order::getOrderType, OrderType.TAKEOUT.name());
-        applyStatusFilter(query, statusGroup, status);
+                .eq(Order::getOrderType, orderType.name());
+        applyStatusFilter(query, statusGroup, status, activeStatuses(orderType));
         query.orderByDesc(Order::getCreatedAt).orderByDesc(Order::getId);
         IPage<Order> result = orderMapper.selectPage(new Page<>(page, size), query);
         return PageResult.of(orderViewAssembler.toViews(result.getRecords()), result.getTotal(), page, size);
@@ -42,8 +49,14 @@ public class OrderQueryService {
 
     @Transactional(readOnly = true)
     public OrderDetailView detail(Long userId, Long orderId) {
+        return detailByType(userId, orderId, null);
+    }
+
+    /** 顾客侧订单详情；{@code orderType} 非空时校验订单类型，避免跨入口读取。 */
+    @Transactional(readOnly = true)
+    public OrderDetailView detailByType(Long userId, Long orderId, OrderType orderType) {
         Order order = orderMapper.selectById(orderId);
-        if (order == null) {
+        if (order == null || (orderType != null && !orderType.name().equals(order.getOrderType()))) {
             throw new BizException(ErrorCode.NOT_FOUND, "订单不存在");
         }
         if (!order.getUserId().equals(userId)) {
@@ -52,7 +65,17 @@ public class OrderQueryService {
         return orderViewAssembler.toDetail(order);
     }
 
+    static List<String> activeStatuses(OrderType orderType) {
+        return orderType == OrderType.DINE_IN
+                ? OrderStatus.dineInActiveStatuses() : OrderStatus.takeoutActiveStatuses();
+    }
+
     static void applyStatusFilter(LambdaQueryWrapper<Order> query, String statusGroup, String status) {
+        applyStatusFilter(query, statusGroup, status, OrderStatus.takeoutActiveStatuses());
+    }
+
+    static void applyStatusFilter(LambdaQueryWrapper<Order> query, String statusGroup, String status,
+                                  List<String> activeStatuses) {
         if (StringUtils.hasText(status)) {
             if (!OrderStatus.isValid(status)) {
                 throw new BizException(ErrorCode.PARAM_INVALID, "非法的订单状态");
@@ -65,8 +88,7 @@ public class OrderQueryService {
             throw new BizException(ErrorCode.PARAM_INVALID, "非法的状态分组");
         }
         if (OrderStatusGroup.ACTIVE.name().equals(group)) {
-            query.in(Order::getStatus, List.of(OrderStatus.PENDING_PAYMENT.name(), OrderStatus.PAID.name(),
-                    OrderStatus.ACCEPTED.name(), OrderStatus.MAKING.name(), OrderStatus.DELIVERING.name()));
+            query.in(Order::getStatus, activeStatuses);
         } else if (OrderStatusGroup.FINISHED.name().equals(group)) {
             query.in(Order::getStatus, List.of(OrderStatus.COMPLETED.name(), OrderStatus.CANCELLED.name(),
                     OrderStatus.REJECTED.name()));

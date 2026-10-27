@@ -36,13 +36,31 @@ public class MerchantOrderService {
 
     @Transactional(readOnly = true)
     public PageResult<OrderView> list(Long merchantId, String statusGroup, String status, int page, int size) {
+        return listByType(merchantId, OrderType.TAKEOUT, statusGroup, status, page, size);
+    }
+
+    /** 按订单类型分页查询商家订单（外卖/堂食），ACTIVE 集合随类型不同。 */
+    @Transactional(readOnly = true)
+    public PageResult<OrderView> listByType(Long merchantId, OrderType orderType,
+                                            String statusGroup, String status, int page, int size) {
         LambdaQueryWrapper<Order> query = Wrappers.<Order>lambdaQuery()
                 .eq(Order::getMerchantId, merchantId)
-                .eq(Order::getOrderType, OrderType.TAKEOUT.name());
-        OrderQueryService.applyStatusFilter(query, statusGroup, status);
+                .eq(Order::getOrderType, orderType.name());
+        OrderQueryService.applyStatusFilter(query, statusGroup, status,
+                OrderQueryService.activeStatuses(orderType));
         query.orderByDesc(Order::getCreatedAt).orderByDesc(Order::getId);
         IPage<Order> result = orderMapper.selectPage(new Page<>(page, size), query);
         return PageResult.of(orderViewAssembler.toViews(result.getRecords()), result.getTotal(), page, size);
+    }
+
+    /** 商家堂食订单详情（只允许堂食类型）。 */
+    @Transactional(readOnly = true)
+    public OrderDetailView detailByType(Long merchantId, Long orderId, OrderType orderType) {
+        Order order = requireOwnedOrder(merchantId, orderId);
+        if (!orderType.name().equals(order.getOrderType())) {
+            throw new BizException(ErrorCode.NOT_FOUND, "订单不存在");
+        }
+        return orderViewAssembler.toDetail(order);
     }
 
     @Transactional(readOnly = true)

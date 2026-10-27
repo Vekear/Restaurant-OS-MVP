@@ -2,6 +2,7 @@ package com.restaurant.ws;
 
 import com.restaurant.contract.event.OrderStatusChangedEvent;
 import com.restaurant.contract.event.PaymentSucceededEvent;
+import com.restaurant.contract.event.TableSessionClosedEvent;
 import com.restaurant.common.log.TraceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,23 @@ public class OrderEventListener {
         payload.put("at", event.paidAt());
         payload.put("traceId", TraceContext.currentTraceId());
         send("/topic/orders/" + event.orderId(), payload);
+    }
+
+    @EventListener
+    public void onTableSessionClosed(TableSessionClosedEvent event) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("eventType", "TABLE_SESSION_CLOSED");
+        payload.put("tableId", event.tableId());
+        payload.put("tableNo", event.tableNo());
+        payload.put("merchantId", event.merchantId());
+        payload.put("sessionId", event.sessionId());
+        payload.put("reason", event.reason());
+        payload.put("at", event.at());
+        payload.put("traceId", event.traceId());
+        send("/topic/table/" + event.tableId(), payload);
+        if (event.merchantId() != null) {
+            send("/topic/merchant/" + event.merchantId() + "/tables", payload);
+        }
     }
 
     private void send(String destination, Object payload) {

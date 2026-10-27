@@ -52,6 +52,12 @@ public class OssFileStorage implements FileStorageService {
     }
 
     @Override
+    public FileObjectView storeBytes(byte[] bytes, String contentType, String originalName,
+                                     String bizType, Long uploaderId) {
+        throw new BizException(ErrorCode.STORAGE_ERROR, "OSS 直传模式不支持服务端生成文件");
+    }
+
+    @Override
     public FilePolicyView policy(String bizType, String ext) {
         String normalizedBizType = FileValidation.requireAnyBizType(bizType);
         OssPostPolicyService.Policy policy = ossPostPolicyService.buildPolicy(normalizedBizType, ext);

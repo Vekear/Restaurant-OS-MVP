@@ -5,6 +5,7 @@ import com.restaurant.common.api.Result;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -41,6 +42,15 @@ public class GlobalExceptionHandler {
         log.warn("业务异常 code={} message={}", exception.getCode(), exception.getMessage());
         return ResponseEntity.status(exception.getHttpStatus())
                 .body(Result.failure(exception.getErrorCode(), exception.getMessage()));
+    }
+
+    /** 限流：HTTP 429 + 42901 + Retry-After。 */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Result<Void>> handleRateLimitExceeded(RateLimitExceededException exception) {
+        log.warn("请求被限流 retryAfter={}s", exception.getRetryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()))
+                .body(Result.failure(ErrorCode.TOO_MANY_REQUESTS));
     }
 
     /**

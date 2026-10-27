@@ -13,8 +13,10 @@ spring:
       database: 15
   flyway:
     clean-disabled: false
-    # 测试库允许每次启动重建（由测试基类决定是否 clean）
+    # 测试库已存在同版本 schema（无 flyway_schema_history），以 baseline 2 接管，跳过 V1/V2
+    # 说明：数据库运维由 Lead 独占，测试不执行 clean/DROP，避免误伤共享环境
     baseline-on-migrate: true
+    baseline-version: 2
 
 management:
   endpoint:

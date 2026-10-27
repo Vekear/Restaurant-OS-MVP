@@ -1,7 +1,10 @@
 package com.restaurant.security;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -10,24 +13,37 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
- * Spring Security 骨架（T05 占位实现）。
+ * Spring Security 配置（T06：JWT 双入口 + RBAC）。
  *
- * <p><b>T06 将替换本类</b>：接入 JWT 双入口（Web Bearer / 小程序 code2session）、
- * 角色 RBAC、401/403 JSON 响应、Redis 限流与登出黑名单。
- * 当前仅关闭表单登录/CSRF、保持无状态并放行全部请求，避免骨架阶段默认 Basic 认证挡住
- * Swagger、Actuator 与后续接口联调。
+ * <p>入口：Web/管理后台走 {@code POST /auth/login}；小程序走 {@code POST /auth/wechat/login}；
+ * 两条入口签发同一套 JWT，由 {@link JwtAuthenticationFilter} 统一校验。
+ * 白名单严格对齐 {@code docs/02-api.md §1}；{@code /api/v1/admin/**} 仅 ADMIN、
+ * {@code /api/v1/merchant/**} 仅 MERCHANT，其余 {@code /api/v1/**} 需登录。
+ * 未认证/无权限分别由 {@link RestAuthenticationEntryPoint}、{@link RestAccessDeniedHandler}
+ * 输出统一 JSON（40101/40102/40103、40301）。
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    private final RateLimitFilter rateLimitFilter;
+
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
+
+    private final CorsConfigurationSource corsConfigurationSource;
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   CorsConfigurationSource corsConfigurationSource) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -35,10 +51,59 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // TODO(T06): 替换为 /auth/login|register|wechat/login、GET /menu/**、/files/**、/actuator/health 放行，
-                //  其余按 CUSTOMER / MERCHANT / ADMIN 角色鉴权，并注册 JwtAuthenticationFilter。
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // 双入口登录 + 注册（未登录可访问）
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/wechat/login").permitAll()
+                        // 公开只读接口：菜单/商家/公共配置/本地文件
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/menu/**",
+                                "/api/v1/merchants/**",
+                                "/api/v1/public/**",
+                                "/api/v1/files/**").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/error",
+                                "/ws/**").permitAll()
+                        // 模拟支付网关回调：内部调用，由 Nginx 限制来源
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/mock/callback").permitAll()
+                        // RBAC
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/merchant/**").hasRole("MERCHANT")
+                        .requestMatchers("/api/v1/**").authenticated()
+                        .anyRequest().permitAll())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rateLimitFilter, JwtAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * 关闭 Servlet 容器对 JWT 过滤器的自动注册：该过滤器只应存在于 Spring Security 过滤链中，
+     * 否则会被执行两次。
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    /** 同上：限流过滤器只允许在 Security 链中执行一次，避免重复计数。 */
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     /** 密码哈希统一 BCrypt(cost 10)（{@code docs/01-architecture.md §16.8}）。 */

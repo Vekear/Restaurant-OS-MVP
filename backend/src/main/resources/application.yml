@@ -203,9 +203,14 @@ app:
     menu-ttl-minutes: ${MENU_CACHE_TTL_MINUTES:10}
 
   rate-limit:
-    login-per-minute: ${RATE_LIMIT_LOGIN:5}
-    payment-per-minute: ${RATE_LIMIT_PAYMENT:10}
-    api-per-minute: ${RATE_LIMIT_API:120}
+    # 登录：按客户端 IP 限流（次/分钟）
+    login: ${RATE_LIMIT_LOGIN:5}
+    # 创建订单：按用户限流（次/分钟）
+    order: ${RATE_LIMIT_ORDER:10}
+    # 支付/模拟支付：按用户限流（次/分钟）
+    payment: ${RATE_LIMIT_PAYMENT:10}
+    # 其余已认证接口：按用户+方法+路径限流（次/分钟）
+    api: ${RATE_LIMIT_API:120}
 
   task:
     # Spring Task 总开关（测试 profile 关闭，避免后台任务干扰断言）

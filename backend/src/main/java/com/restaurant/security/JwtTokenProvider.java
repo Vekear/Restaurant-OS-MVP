@@ -67,7 +67,7 @@ public class JwtTokenProvider {
                 .issuer(issuer)
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))
-                .signWith(secretKey)
+                .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
         return new IssuedToken(token, jti, expiresAt, expireSeconds);
     }

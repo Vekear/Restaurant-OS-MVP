@@ -22,13 +22,17 @@ const Checkout = () => import('@/views/customer/Checkout.vue')
 const Orders = () => import('@/views/customer/Orders.vue')
 const OrderDetail = () => import('@/views/customer/OrderDetail.vue')
 const Addresses = () => import('@/views/customer/Addresses.vue')
+const MerchantDashboard = () => import('@/views/merchant/Dashboard.vue')
+const MerchantOrders = () => import('@/views/merchant/Orders.vue')
+const MerchantDishes = () => import('@/views/merchant/Dishes.vue')
+const MerchantTables = () => import('@/views/merchant/Tables.vue')
+const MerchantStats = () => import('@/views/merchant/Stats.vue')
 const Login = () => import('@/views/auth/Login.vue')
 const Register = () => import('@/views/auth/Register.vue')
 const Placeholder = () => import('@/views/common/Placeholder.vue')
 const Forbidden = () => import('@/views/common/Forbidden.vue')
 const NotFound = () => import('@/views/common/NotFound.vue')
 
-const T13 = '阶段 5 · T13'
 const T14 = '阶段 5 · T14'
 
 const routes = [
@@ -139,91 +143,57 @@ const routes = [
       {
         path: 'dashboard',
         name: 'merchant-dashboard',
-        component: Placeholder,
+        component: MerchantDashboard,
         meta: {
           title: '经营概览',
-          description: '今日营收、订单结构、出餐效率与实时订单看板。',
-          phase: T13,
-          planned: [
-            { title: '核心指标卡', desc: '营业额、订单数、客单价与退款率' },
-            { title: '实时订单流', desc: 'WebSocket 推送的新订单与出餐提醒' },
-            { title: '趋势图表', desc: 'ECharts 展示近 7 天营业额与订单量' }
-          ]
+          description: '今日营业额、订单结构、待接单数量与低库存预警，WebSocket 实时刷新。'
         }
       },
       {
         path: 'orders',
         name: 'merchant-orders',
-        component: Placeholder,
+        component: MerchantOrders,
+        props: { orderType: 'TAKEOUT' },
         meta: {
           title: '外卖订单',
-          description: '接单 → 出餐 → 配送 → 完成 的外部订单状态机操作。',
-          phase: T13,
-          planned: [
-            { title: '订单看板', desc: '按状态分列展示，支持一键接单与出餐' },
-            { title: '状态机操作', desc: '仅允许合法流转，非法操作由后端拒绝' },
-            { title: '实时提醒', desc: 'WebSocket 新订单铃声与角标提醒' }
-          ]
+          description: '外卖订单看板：接单 → 制作中 → 出餐配送 → 完成，非法流转由后端拒绝。'
         }
       },
       {
         path: 'dine-in',
         name: 'merchant-dine-in',
-        component: Placeholder,
+        component: MerchantOrders,
+        props: { orderType: 'DINE_IN' },
         meta: {
           title: '堂食订单',
-          description: '扫码点餐订单处理，与桌台状态机联动。',
-          phase: T13,
-          planned: [
-            { title: '堂食订单列表', desc: '桌号、人数、菜品与加菜记录' },
-            { title: '桌台联动', desc: '开台 / 就餐中 / 待清台 状态同步' },
-            { title: '结账与清台', desc: '结账后自动释放桌台并生成营收' }
-          ]
+          description: '按桌号处理扫码订单：接单 → 制作中 → 已出餐 → 完成（关闭桌台会话）。'
         }
       },
       {
         path: 'dishes',
         name: 'merchant-dishes',
-        component: Placeholder,
+        component: MerchantDishes,
         meta: {
           title: '菜品管理',
-          description: '菜品分类、规格、库存、上下架与图片直传。',
-          phase: T13,
-          planned: [
-            { title: '菜品列表', desc: '分类树、搜索与批量上下架' },
-            { title: '编辑表单', desc: '规格/加料配置与价格库存校验' },
-            { title: '图片直传', desc: 'OSS 直传，失败时降级本地 /files 存储' }
-          ]
+          description: '分类与菜品维护、库存调整、上下架及图片上传（OSS 直传降级本地）。'
         }
       },
       {
         path: 'tables',
         name: 'merchant-tables',
-        component: Placeholder,
+        component: MerchantTables,
         meta: {
           title: '桌台管理',
-          description: '桌台区域、二维码与占用状态管理。',
-          phase: T13,
-          planned: [
-            { title: '桌台网格', desc: '按区域展示桌台与实时状态色' },
-            { title: '二维码生成', desc: '生成桌台二维码供小程序扫码点餐' },
-            { title: '状态维护', desc: '空闲 / 就餐中 / 待清台手动纠偏' }
-          ]
+          description: '桌台 CRUD、占用状态与二维码查看 / 下载 / 重签。'
         }
       },
       {
         path: 'stats',
         name: 'merchant-stats',
-        component: Placeholder,
+        component: MerchantStats,
         meta: {
           title: '营业报表',
-          description: '营业额趋势、热销菜品与 POI 报表导出。',
-          phase: T13,
-          planned: [
-            { title: '营收趋势', desc: '按日 / 周 / 月切换的 ECharts 折线图' },
-            { title: '热销排行', desc: '菜品销量与销售额 Top N' },
-            { title: '导出报表', desc: '后端 POI 生成 Excel，前端下载流式文件' }
-          ]
+          description: '营业额趋势、热销菜品、订单类型占比与 Excel 导出。'
         }
       }
     ]

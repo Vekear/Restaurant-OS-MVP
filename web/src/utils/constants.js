@@ -49,6 +49,11 @@ export const USER_STATUS_TAG_TYPES = Object.freeze({
 })
 
 /** 通用启用/停用状态（菜品、分类、优惠券、商家等） */
+export const COMMON_STATUS = Object.freeze({
+  ENABLED: 'ENABLED',
+  DISABLED: 'DISABLED'
+})
+
 export const COMMON_STATUS_LABELS = Object.freeze({
   ENABLED: '启用',
   DISABLED: '停用'

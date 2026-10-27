@@ -89,13 +89,15 @@ pnpm dev:mp-weixin        # 微信开发者工具导入 dist/dev/mp-weixin
 ### 构建
 
 ```bash
-pnpm build:mp-weixin   # 产物：dist/build/mp-weixin
-pnpm build:h5          # 产物：dist/build/h5
-pnpm build:h5:mock     # 演示模式 H5 产物
+pnpm build:mp-weixin        # 产物：dist/build/mp-weixin（对接真实后端）
+pnpm build:mp-weixin:mock   # 演示模式小程序产物（内置假数据，无需后端）
+pnpm build:h5               # 产物：dist/build/h5
+pnpm build:h5:mock          # 演示模式 H5 产物
 ```
 
 微信开发者工具：**先执行 `pnpm build:mp-weixin`**，再导入 `miniprogram/` 目录或直接导入 `dist/build/mp-weixin`。
 仓库根的 `project.config.json` 已设置 `miniprogramRoot: "dist/build/mp-weixin"`，所以导入 `miniprogram/` 也能直接编译运行（未构建时会出现「在项目根目录未找到 app.json」）。
+后端堂食/支付接口尚未交付时，建议先 `pnpm build:mp-weixin:mock` 生成演示模式产物，开发者工具里即可完整体验菜单、加购、扫码入座（mock）与模拟支付。
 开发阶段热更新：运行 `pnpm dev:mp-weixin`，把 `miniprogramRoot` 改为 `dist/dev/mp-weixin`（或直接导入该目录）。
 `project.config.json` 已关闭 `urlCheck`（不校验合法域名），因为后端地址为 `http://127.0.0.1:8080`；若被 `project.private.config.json` 覆盖，请确认其中 `setting.urlCheck` 也为 `false`。
 

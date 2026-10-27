@@ -3,10 +3,19 @@ import { IS_MOCK, mockDelay } from '@/mock'
 import { MOCK_CATEGORIES, MOCK_DISHES } from '@/mock/menu'
 
 /**
- * 菜单接口封装（契约集中在此文件，后端字段如有调整只需改这里）。
- * - GET /api/v1/menu/categories                分类列表
- * - GET /api/v1/menu/items?categoryId=&keyword= 菜品列表（后端支持关键字搜索）
+ * 菜单接口封装（契约来源：docs/02-api.md §6，集中在此文件，后端字段调整只需改这里）。
+ * - GET /api/v1/menu/categories                    → data: CategoryView[]
+ * - GET /api/v1/menu/dishes?merchantId=&categoryId=&keyword=&sort=&page=&size=
+ *                                                 → data: PageResult<DishSummaryView>
+ *
+ * 契约要点：/menu/dishes 默认 size=12（1–100），sort 仅 default/price_asc/price_desc/sales_desc；
+ * 分页结构固定 { list, total, page, size, pages }；soldOut = stock <= 0 仍返回，前端置灰。
  */
+
+/** 菜品分页默认值（与后端契约一致） */
+const DEFAULT_PAGE = 1
+const DEFAULT_SIZE = 12
+const MAX_SIZE = 100
 
 function toList(payload) {
   if (Array.isArray(payload)) return payload
@@ -19,12 +28,32 @@ function toList(payload) {
   return []
 }
 
+/** 归一化分页响应：PageResult<T> → { list, total, page, size, pages } */
+export function normalizePage(payload, page, size) {
+  const currentPage = Number(page) || DEFAULT_PAGE
+  const currentSize = Number(size) || DEFAULT_SIZE
+  const list = toList(payload)
+  const total = Number(payload && payload.total) || list.length
+  const pages =
+    Number(payload && payload.pages) ||
+    (currentSize > 0 ? Math.ceil(total / currentSize) : 0)
+  return {
+    list: list.map(normalizeDish),
+    total,
+    page: Number(payload && payload.page) || currentPage,
+    size: Number(payload && payload.size) || currentSize,
+    pages
+  }
+}
+
 export function normalizeCategory(raw) {
   const item = raw || {}
   return {
     id: item.id !== undefined ? item.id : item.categoryId,
     name: item.name || item.categoryName || '',
-    sort: Number(item.sort !== undefined ? item.sort : item.sortOrder || 0)
+    sort: Number(item.sort !== undefined ? item.sort : item.sortOrder || 0),
+    dishCount: Number(item.dishCount !== undefined ? item.dishCount : 0),
+    status: item.status
   }
 }
 
@@ -35,45 +64,75 @@ export function normalizeDish(raw) {
   return {
     id: item.id !== undefined ? item.id : item.dishId,
     categoryId: item.categoryId !== undefined ? item.categoryId : item.category_id,
+    categoryName: item.categoryName || '',
     name: item.name || item.dishName || '',
     description: item.description || item.desc || item.remark || '',
     price: Number(item.price !== undefined ? item.price : item.unitPrice || 0),
+    originalPrice: item.originalPrice === undefined || item.originalPrice === null ? null : Number(item.originalPrice),
     image: item.imageUrl || item.image || item.coverUrl || item.picture || '',
     sales: Number(item.sales !== undefined ? item.sales : item.salesCount || 0),
     stock,
-    soldOut: stock !== null && stock <= 0,
-    tags: Array.isArray(item.tags) ? item.tags : [],
-    status: item.status
+    soldOut: item.soldOut === true || (stock !== null && stock <= 0),
+    status: item.status,
+    tags: Array.isArray(item.tags) ? item.tags : []
   }
 }
 
-export function fetchCategories() {
+/** GET /menu/categories（可选 merchantId） */
+export function fetchCategories(merchantId) {
   if (IS_MOCK) {
-    return mockDelay(MOCK_CATEGORIES, 180)
+    return mockDelay(MOCK_CATEGORIES.map(normalizeCategory), 180)
   }
-  return http.get('/menu/categories').then((payload) => toList(payload).map(normalizeCategory))
+  const query = {}
+  if (merchantId !== undefined && merchantId !== null) query.merchantId = merchantId
+  return http.get('/menu/categories', query).then((payload) => toList(payload).map(normalizeCategory))
 }
 
+/**
+ * GET /menu/dishes（分页）
+ * @param {{categoryId?:number|string, keyword?:string, sort?:string, page?:number, size?:number, merchantId?:number|string}} params
+ * @returns {Promise<{list:Array,total:number,page:number,size:number,pages:number}>}
+ */
 export function fetchDishes(params = {}) {
-  const { categoryId, keyword } = params
+  const page = Math.max(DEFAULT_PAGE, Number(params.page) || DEFAULT_PAGE)
+  const size = Math.min(MAX_SIZE, Math.max(1, Number(params.size) || DEFAULT_SIZE))
+  const keyword = String(params.keyword || '').trim()
+  const sort = params.sort || ''
+
   if (IS_MOCK) {
-    const key = String(keyword || '').trim()
     const list = MOCK_DISHES.filter((dish) => {
       const matchCategory =
-        categoryId === undefined || categoryId === null || String(dish.categoryId) === String(categoryId)
+        params.categoryId === undefined ||
+        params.categoryId === null ||
+        params.categoryId === '' ||
+        String(dish.categoryId) === String(params.categoryId)
       const matchKeyword =
-        !key ||
-        dish.name.indexOf(key) !== -1 ||
-        String(dish.description || '').indexOf(key) !== -1
+        !keyword ||
+        dish.name.indexOf(keyword) !== -1 ||
+        String(dish.description || '').indexOf(keyword) !== -1
       return matchCategory && matchKeyword
     })
-    return mockDelay(list.map(normalizeDish), 220)
+    const start = (page - 1) * size
+    const pageList = list.slice(start, start + size)
+    return mockDelay(
+      {
+        list: pageList.map(normalizeDish),
+        total: list.length,
+        page,
+        size,
+        pages: size > 0 ? Math.ceil(list.length / size) : 0
+      },
+      220
+    )
   }
 
-  const query = {}
-  if (categoryId !== undefined && categoryId !== null && categoryId !== '') {
-    query.categoryId = categoryId
+  const query = { page, size }
+  if (params.categoryId !== undefined && params.categoryId !== null && params.categoryId !== '') {
+    query.categoryId = params.categoryId
   }
   if (keyword) query.keyword = keyword
-  return http.get('/menu/items', query).then((payload) => toList(payload).map(normalizeDish))
+  if (sort && sort !== 'default') query.sort = sort
+  if (params.merchantId !== undefined && params.merchantId !== null) query.merchantId = params.merchantId
+
+  return http.get('/menu/dishes', query).then((payload) => normalizePage(payload, page, size))
 }

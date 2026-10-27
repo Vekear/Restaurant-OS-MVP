@@ -94,24 +94,28 @@ pnpm build:h5:mock     # 演示模式 H5 产物
 
 未配置 `VITE_API_BASE_URL` 时：H5 使用同源 `/api/v1`（走 Vite 代理），小程序使用 `http://127.0.0.1:8080/api/v1`（可用 `.env.development.local` 覆盖为局域网地址做真机调试）。
 
-## 5. 接口契约（当前假设，集中封装便于调整）
+## 5. 接口契约（已对齐 `docs/02-api.md` 冻结契约）
 
-> 后端接口文档（docs/02-api.md）在本阶段尚未定稿，以下按 brief 的统一响应约定实现，并与后端联调时只需修改 `src/api/`。
+> 端点路径以 `docs/02-api.md` §1 端点索引为准，统一封装在 `src/api/`；后端字段调整只需改这一层。
 
-统一响应：`{ code, message, data, traceId }`，`code === 0` 视为成功；否则用 `message` 提示。
+统一响应：`{ code, message, data, traceId }`，`code === 0` 视为成功；否则用 `message` 提示。分页响应 `data` 固定为 `PageResult`：`{ list, total, page, size, pages }`。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/auth/wx/login` | 入参 `{ code }`（`uni.login` 获取），返回 `{ token, user }`（兼容 `accessToken`/`userInfo` 命名） |
-| GET | `/menu/categories` | 菜品分类列表 |
-| GET | `/menu/items?categoryId=&keyword=` | 菜品列表（支持分类过滤与关键字搜索） |
+| POST | `/auth/wechat/login` | 入参 `{ code }`（`uni.login` 获取），返回 `AuthTokenView`：`{ token, tokenType, expiresIn, user }`（`data` 层，`request.js` 已解包） |
+| GET | `/menu/categories?merchantId=` | 分类列表 `CategoryView[]`（按 `sort ASC, id ASC`） |
+| GET | `/menu/dishes?merchantId=&categoryId=&keyword=&sort=&page=&size=` | 菜品分页 `PageResult<DishSummaryView>`，`size` 默认 12（1–100），`sort` ∈ `default/price_asc/price_desc/sales_desc` |
 
-字段归一化：分类兼容 `id/name/sort`；菜品兼容 `price/image/imageUrl/coverUrl/stock/sales/soldOut/tags`，列表结果兼容 `list/records/items/content/rows/data`。
+后续阶段（T17）将按同一契约接入：
+`POST /dine-in/scan`、`POST /dine-in/bind`、`GET /dine-in/session`（堂食会话，需请求头 `X-Table-Session`）、`POST /dine-in/orders`、`POST /payments`、`POST /payments/{payNo}/mock-pay`（以上下单/支付接口须带 `Idempotency-Key`）、`GET /files/policy`、`POST /files/upload`、`POST /files/confirm`。
+
+字段归一化：分类 `id/name/sort/dishCount/status`；菜品 `id/name/categoryId/categoryName/price/originalPrice/imageUrl/stock/sales/status/soldOut/tags`（兼容 `image/coverUrl` 等历史命名）；`fetchDishes` 返回归一化后的 `PageResult`，页内渲染只需 `.list`。
 
 ## 6. 关键实现说明
 
-- **请求封装**（`src/api/request.js`）：自动附带 `Authorization: Bearer <token>`；HTTP 401 时清理登录态、广播 `auth:unauthorized` 并跳转登录页（带防重入）；错误统一为 `{ code, message, traceId, statusCode }`；网络异常提示「网络异常，请检查网络或后端服务是否已启动」；支持 `loading` 计数与自定义 `silent`。
-- **登录**：小程序端 `uni.login({ provider: 'weixin' })` 取 `code` → `POST /auth/wx/login`；H5 无微信环境时生成降级 code。mock 模式下不发请求，直接返回假 token 与假用户（`wechat.mock=true` 场景）。
+- **请求封装**（`src/api/request.js`）：自动附带 `Authorization: Bearer <token>`；HTTP 401 时清理登录态、广播 `auth:unauthorized` 并跳转登录页（带防重入）；错误统一为 `{ code, message, traceId, statusCode }`；网络异常提示「网络异常，请检查网络或后端服务是否已启动」；支持 `loading` 计数与自定义 `silent`、自定义 `header`（供 T17 的 `X-Table-Session`、`Idempotency-Key` 使用）。
+- **登录**：小程序端 `uni.login({ provider: 'weixin' })` 取 `code` → `POST /auth/wechat/login`；H5 无微信环境时使用一次性回退 code（需后端 `wechat.mock=true`）。mock 模式下不发请求，直接返回假 token 与假用户。
+- **平台判定**：使用 uni-app 条件编译 `// #ifdef MP-WEIXIN` 得到 `IS_MINI_PROGRAM`，而非运行时探测 `wx`（H5 产物中的 `wx` 兼容对象不可靠，且 `uni.login` 在 H5 不可用）。
 - **图片兜底**：`AppImage.vue` 统一处理相对路径与绝对地址；加载失败自动切换 `static/placeholder.png`；后端 `storage.type=local` 时 `/files/**` 会拼上源站地址。
 - **购物车**：模块级 reactive + `uni.setStorageSync` 持久化（key `restaurant_mp_cart_v1`），单菜上限 99 份；数量变化同步 tabBar 角标，首次启动 tabBar 未挂载时自动重试（最多 3 次），避免首屏角标丢失。
 - **登录态**：token 与用户信息存于本地存储（`restaurant_mp_token` / `restaurant_mp_user`），启动时恢复；退出登录清除缓存。
@@ -194,7 +198,8 @@ SMOKE_PASS: 菜单卡片 15 张 | 分类标签 7 个（含全部） | 无横向�
 
 以静态服务器托管 `dist/build/h5` 并反代 `/api` 到 8080 的临时桩服务（统一响应 `{code,message,data,traceId}`），验证非 mock 链路：
 
-- 分类来自后端：`招牌推荐`、`热菜`；菜品来自后端：`后端招牌鸡 ¥66.00 已售 88`、`后端小炒肉 ¥36.00`（`stock=0` 渲染为「已售罄」）。
+- 分类来自后端：`招牌推荐`、`热菜`；菜品来自后端：`后端招牌鸡 ¥66.00 已售 88`、`后端小炒肉 ¥36.00`（`stock=0` 渲染为「已售罄」）；实际请求为 `GET /api/v1/menu/dishes?page=1&size=50`（无 404，路径与冻结契约一致）。
+- 登录链路（H5 真实 HTTP）：点击「微信一键登录」→ `POST /api/v1/auth/wechat/login`（body `{ code: "h5_..." }`）→ 保存 `real-token-from-stub` 与用户 `后端联调用户` → 跳转菜单并继续请求分类/菜品；控制台 0 错误。
 - 停掉后端时页面展示错误态：「菜单加载失败 / 网络异常，请检查网络或后端服务是否已启动 / 重新加载」，无 JS 异常。
 - 说明：测试用的桩服务与静态服务器为临时脚本，未纳入代码仓库。
 

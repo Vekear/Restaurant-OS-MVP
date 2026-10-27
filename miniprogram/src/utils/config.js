@@ -6,8 +6,17 @@
 /** 后端本地开发地址（小程序端必须使用绝对地址；H5 开发期走 vite 代理） */
 const DEFAULT_BACKEND_ORIGIN = 'http://127.0.0.1:8080'
 
-/** 是否运行在微信小程序/小程序容器中（H5 中 wx 为 undefined） */
-export const IS_MINI_PROGRAM = typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function'
+/**
+ * 是否运行在微信小程序端。
+ * 使用 uni-app 条件编译（编译期决定），避免 H5 产物里 `wx` 兼容对象误判：
+ * H5 生产构建中 `wx` 可能以对象形式存在，但 `uni.login` 不可用。
+ */
+// #ifdef MP-WEIXIN
+export const IS_MINI_PROGRAM = true
+// #endif
+// #ifndef MP-WEIXIN
+export const IS_MINI_PROGRAM = false
+// #endif
 
 const env = import.meta.env || {}
 const rawBaseUrl = String(env.VITE_API_BASE_URL || '').trim()

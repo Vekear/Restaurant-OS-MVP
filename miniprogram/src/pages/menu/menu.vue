@@ -185,12 +185,16 @@ async function loadDishes() {
   loading.value = true
   error.value = ''
   try {
-    const list = await fetchDishes({
+    // 契约 GET /menu/dishes 为分页接口（默认 size=12），此处一次取 50 条覆盖 MVP 菜单；
+    // 分页字段已由 fetchDishes 归一化，后续可接 onReachBottom 做加载更多。
+    const pageData = await fetchDishes({
       categoryId: activeCategory.value === 'all' ? undefined : activeCategory.value,
-      keyword: keyword.value.trim() || undefined
+      keyword: keyword.value.trim() || undefined,
+      page: 1,
+      size: 50
     })
     if (seq !== requestSeq) return
-    dishes.value = list.map((dish) => Object.assign({}, dish, { hot: Number(dish.sales) >= 200 }))
+    dishes.value = pageData.list.map((dish) => Object.assign({}, dish, { hot: Number(dish.sales) >= 200 }))
   } catch (err) {
     if (seq !== requestSeq) return
     error.value = err && err.message ? err.message : '菜单加载失败，请稍后重试'

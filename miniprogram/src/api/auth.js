@@ -4,10 +4,10 @@ import { buildMockLoginResponse } from '@/mock/user'
 
 /**
  * 微信小程序登录：`uni.login` 得到的 code 交给后端换取 JWT。
- * 后端接口（契约）：POST /api/v1/auth/wx/login  body: { code }
- * 响应 data 兼容多种命名（token / accessToken，user / userInfo）。
+ * 契约（docs/02-api.md §4.3）：POST /api/v1/auth/wechat/login  body: { code }
+ * 响应 data = AuthTokenView：{ token, tokenType, expiresIn, user: { id, username, nickname, role, merchantId, status } }
  *
- * 注意：后端开启 `wechat.mock=true` 时接受任意 code；小程序端在无法获取真实 code
+ * 注意：后端开启 `wechat.mock=true` 时接受任意非空 code；小程序端在无法获取真实 code
  * （H5 预览、开发者工具限制）时回退到 mock code，便于本地联调。
  */
 export function wxLogin(code) {
@@ -15,7 +15,7 @@ export function wxLogin(code) {
     return mockDelay(buildMockLoginResponse(code), 420)
   }
   return http.post(
-    '/auth/wx/login',
+    '/auth/wechat/login',
     { code },
     { auth: false, silent: true }
   )

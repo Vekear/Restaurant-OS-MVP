@@ -94,8 +94,10 @@ pnpm build:h5          # 产物：dist/build/h5
 pnpm build:h5:mock     # 演示模式 H5 产物
 ```
 
-微信开发者工具：导入 `dist/build/mp-weixin`，测试号可直接使用（`project.config.json` 中为 `touristappid`）。
-本地联调时需在开发者工具中勾选「不校验合法域名」，因为后端地址为 `http://127.0.0.1:8080`。
+微信开发者工具：**先执行 `pnpm build:mp-weixin`**，再导入 `miniprogram/` 目录或直接导入 `dist/build/mp-weixin`。
+仓库根的 `project.config.json` 已设置 `miniprogramRoot: "dist/build/mp-weixin"`，所以导入 `miniprogram/` 也能直接编译运行（未构建时会出现「在项目根目录未找到 app.json」）。
+开发阶段热更新：运行 `pnpm dev:mp-weixin`，把 `miniprogramRoot` 改为 `dist/dev/mp-weixin`（或直接导入该目录）。
+`project.config.json` 已关闭 `urlCheck`（不校验合法域名），因为后端地址为 `http://127.0.0.1:8080`；若被 `project.private.config.json` 覆盖，请确认其中 `setting.urlCheck` 也为 `false`。
 
 ## 4. 环境变量
 
@@ -291,3 +293,5 @@ VITE_PROXY_TARGET=http://127.0.0.1:8090 pnpm dev:h5   # 代理到本地契约桩
 | 小程序请求失败 | 开发者工具「详情 → 本地设置」勾选「不校验合法域名」，并确认后端已启动在 8080 |
 | H5 页面空白 | 使用 `pnpm dev:h5:mock` 先验证前端自身；对接后端时确认代理目标端口正确 |
 | `project.config.json` 中 appid 为 touristappid | 未配置真实 AppID 时的测试号占位，正式发布前在 `src/manifest.json` 的 `mp-weixin.appid` 填写 |
+| 模拟器启动失败：`Error: app.json: 在项目根目录未找到 app.json` | 开发者工具导入的是源码根目录，而 `app.json` 在构建产物里。先 `pnpm build:mp-weixin`，项目已配置 `miniprogramRoot: "dist/build/mp-weixin"`；若仍报错，重新打开项目或直接导入 `dist/build/mp-weixin` |
+| 小程序里请求 http://127.0.0.1:8080 被拦截 | 开发者工具「详情 → 本地设置」勾选「不校验合法域名」（仓库已把 `urlCheck` 设为 `false`，如仍生效请检查 `project.private.config.json`） |

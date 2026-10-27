@@ -1,9 +1,9 @@
 # E2E（Playwright）— Web 顾客 / 商家 / 管理后台
 
-餐厅点餐系统 MVP 的浏览器端到端测试目录（**JavaScript，严禁 TypeScript**；Playwright 配置为 ESM）。当前共 **38 条用例 / 8 个文件**：
+餐厅点餐系统 MVP 的浏览器端到端测试目录（**JavaScript，严禁 TypeScript**；Playwright 配置为 ESM）。当前共 **41 条用例 / 9 个文件**：
 
 - **mock 驱动（默认，27 条）**：`auth` 8、`menu` 8、`cart` 6、`merchant-orders` 2、`admin-dashboard` 3。在浏览器网络层拦截 `/api/v1/**`，数据严格对齐 `docs/02-api.md`，无需后端与数据库。
-- **真实后端（`E2E_MOCK=0`，11 条）**：`real-auth-rbac` 5、`real-file-upload` 2、`real-order-flow` 4。直连本机真实 Spring Boot + MySQL/Redis；后端不可达时整组 `test.skip`，不伪造通过。
+- **真实后端（`E2E_MOCK=0`，14 条）**：`real-auth-rbac` 5、`real-file-upload` 2、`real-order-flow` 4、`real-dine-in` 3。直连本机真实 Spring Boot + MySQL/Redis；后端不可达时整组 `test.skip`，不伪造通过。
 
 ## 1. 两种运行模式
 
@@ -12,7 +12,7 @@
 | mock 驱动（默认） | `npm test` | Node + 浏览器 + Web dev | `support/api-mocks.js`、`support/admin-mocks.js`、`merchant-orders.spec.js` 内桩拦截接口；mock 用例自动跳过真实用例 |
 | 真后端驱动 | `E2E_MOCK=0 npm test` | Web + Backend(8080) + MySQL/Redis | 不注入桩；只运行 `real-*.spec.js`，mock 用例显式 skip |
 
-mock 模式覆盖页面渲染、表单校验、路由守卫、请求参数、金额/角标联动、空态/错误态、商家订单状态机（有状态桩）、管理后台图表与导出；真实模式覆盖真实登录/RBAC、订单页模拟支付、商家接单→完成、幂等重放、库存不足、文件上传。
+mock 模式覆盖页面渲染、表单校验、路由守卫、请求参数、金额/角标联动、空态/错误态、商家订单状态机（有状态桩）、管理后台图表与导出；真实模式覆盖真实登录/RBAC、订单页模拟支付、商家接单→完成、幂等重放、库存不足、文件上传、堂食扫码/绑定/会话/关台。
 
 ## 2. 服务启动（webServer）
 
@@ -40,7 +40,7 @@ npx playwright install chromium     # 首次运行需下载浏览器
 
 ```bash
 cd e2e
-npm test                  # mock 全量（27 passed / 11 skipped）
+npm test                  # mock 全量（27 passed / 14 skipped）
 npm run test:smoke        # auth + menu（16 条）
 npm run test:auth         # 登录 / 注册（8 条）
 npm run test:cart         # 购物车（6 条）
@@ -48,16 +48,18 @@ npm run test:merchant     # 商家订单看板（2 条，mock 状态机）
 npm run test:admin        # 管理后台（3 条，mock）
 npm run test:headed       # 有界面
 npm run test:ui           # Playwright UI（调试）
-npm run list              # 只列出用例（38 tests / 8 files）
+npm run list              # 只列出用例（41 tests / 9 files）
 
 E2E_BASE_URL=http://127.0.0.1 npm test          # 走 Nginx 网关
-E2E_MOCK=0 npm test                             # 真后端全量（写数据，需 Lead 许可）
+E2E_MOCK=0 npm test                             # 真后端全量（14 条，写数据，需 Lead 许可）
 E2E_MOCK=0 npx playwright test tests/real-auth-rbac.spec.js
+E2E_MOCK=0 npx playwright test tests/real-order-flow.spec.js
+E2E_MOCK=0 npx playwright test tests/real-dine-in.spec.js
 ```
 
 - 报告与产物：`e2e/playwright-report/`（HTML）、`e2e/test-results/`（trace / 失败截图 / 视频）。
 - 根 `.gitignore` 已覆盖 `e2e/test-results/`、`e2e/playwright-report/`、`e2e/blob-report/`、`e2e/.cache/`；`e2e/.gitignore` 为补充。
-- CI 下自动 `retries=1`、`workers=1`、`forbidOnly`；本地默认串行（`fullyParallel: false`）。
+- CI 下自动 `retries=1`、`workers=1`、`forbidOnly`；本地默认串行（`fullyParallel: false`）；真实后端模式固定 `workers=1`（并发会触发登录限流并互相抢库存）。
 
 ## 5. 目录结构与用例清单
 
@@ -76,6 +78,7 @@ e2e/
 │   ├── admin-dashboard.spec.js   # 管理后台图表、导出、审计
 │   ├── real-auth-rbac.spec.js    # 真实登录/RBAC、JWT 篡改、403
 │   ├── real-order-flow.spec.js   # 真实支付 UI、商家状态机、幂等、库存不足/回补
+│   ├── real-dine-in.spec.js      # 真实桌码、扫码/手输开桌、会话查询/关台、签名篡改
 │   └── real-file-upload.spec.js  # 真实 policy/upload/回读、未登录 401
 ├── package.json
 └── README.md
@@ -90,6 +93,7 @@ e2e/
 | `tests/admin-dashboard.spec.js` | 3 | 平台概览 7 指标卡 + 3 ECharts 画布 + 导出请求；数据统计 7 概览卡 + 3 图；订单导出与审计日志渲染 |
 | `tests/real-auth-rbac.spec.js` | 5 | 顾客 UI 登录持久化；未登录 `/cart` → `/login?redirect=/cart`；顾客/商家访问 `/admin/dashboard` → `/403`；商家真实订单列表；无 token/篡改 JWT → 401，顾客调商家接口 → 403 |
 | `tests/real-order-flow.spec.js` | 4 | 顾客订单页模拟支付 ¥0.01 → PAID；商家看板接单→制作→配送→完成；同一 Idempotency-Key 重放同订单；库存不足 40901 + 取消回补 |
+| `tests/real-dine-in.spec.js` | 3 | 商家桌码 → 顾客扫码开桌（sessionToken）→ `X-Table-Session` 查询 → 关台；签名篡改 40004 / 缺失 40001；手输桌号 bind；顾客越权建删桌台 403 |
 | `tests/real-file-upload.spec.js` | 2 | `bizType=dish&ext=png` policy → multipart 上传 → `/files/...` 回读 200 `image/png`；未登录上传 401 |
 
 ## 6. mock 契约与真实栈助手
@@ -102,7 +106,7 @@ e2e/
 `e2e/support/real-stack.js`：
 
 - `apiLogin(request, username, password)`：token 缓存 `e2e/.cache/e2e-tokens.json`（30 分钟、`/auth/me` 校验、429 退避），规避登录 5 次/分/IP 限流。
-- `createOrder` / `getOrder` / `payOrder` / `merchantAction` / `uploadPng` / `fetchMerchantStock` / `pickSellableDish`。
+- `createOrder` / `getOrder` / `payOrder` / `merchantAction` / `uploadPng` / `fetchMerchantStock` / `setDishStock` / `pickSellableDish`。
 - `seedRealSession(page, { token, user })` / `loginViaRealUi(page)`。
 
 新增接口桩时以 `docs/02-api.md` 字段为准，禁止在 `web/` 源码中注入 mock 数据。
@@ -120,18 +124,20 @@ e2e/
 已验证（2026-10-28 本机）：
 
 - `npx playwright install chromium`（经 npmmirror 镜像）→ `chromium-1248`、`chromium_headless_shell-1248`、`ffmpeg-1013`、`winldd-1007`，exit 0。
-- `npx playwright test --list` → **Total: 38 tests in 8 files**，exit 0。
-- `npx playwright test`（mock）→ **27 passed / 11 skipped (11.3s)**，exit 0。
-- `npx playwright test tests/merchant-orders.spec.js` → **2 passed (4.2s)**（T28 回归 + 状态机）。
-- `E2E_MOCK=0 npx playwright test tests/real-auth-rbac.spec.js` → 5 passed。
-- `E2E_MOCK=0 npx playwright test tests/real-file-upload.spec.js` → 2 passed。
-- `E2E_MOCK=0 npx playwright test tests/real-order-flow.spec.js`（T28 修复前）→ 2 passed / 2 failed（商家按钮 disabled、库存断言口径）；已用只读 DOM 探针确认修复后按钮可点，真实点击链路待 Go 后重跑。
-- 后端不可达时 `E2E_MOCK=0 npx playwright test` → 11 skipped，exit 0。
+- `npx playwright test --list` → **Total: 41 tests in 9 files**，exit 0。
+- `npx playwright test`（mock）→ **27 passed / 14 skipped (12.3s)**，exit 0。
+- `npx playwright test tests/merchant-orders.spec.js` → **2 passed**（T28 回归 + 状态机）。
+- `E2E_MOCK=0 npx playwright test`（真实后端）→ **14 passed / 27 skipped (10.1s)**，0 failed，exit 0。
+- `E2E_MOCK=0 npx playwright test tests/real-order-flow.spec.js` → **4 passed (6.7s)**（含 T28 修复后的真实商家状态机点击链路）。
+- `E2E_MOCK=0 npx playwright test tests/real-dine-in.spec.js` → **3 passed (896ms)**。
+- 后端不可达时 `E2E_MOCK=0 npx playwright test` → 真实用例整组 skip，exit 0。
 
 未验证：
 
-- T28 修复后的真实后端商家状态机点击链路与库存用例（写链路暂停，待「T19 real-backend Go」）。
-- 真实堂食扫码/桌台绑定/会话释放、购物车/地址/优惠券页面、管理后台真实接口与 xlsx 打开、WebSocket 推送到达浏览器、OSS 直传、微信真机与小程序 E2E、Nginx/Docker 运行态。
+- 后端 `/admin/**`：控制器已在工作树（7 个），但当前 8080 为 02:14 旧 JVM（未加载新类），实测 404；管理后台真实接口与 xlsx 打开性未验证（UI 由 mock 覆盖）。
+- 购物车/结算/地址/优惠券真实页面（后端无 `/cart`、`/addresses`、`/coupons` 控制器）。
+- 并发超卖、支付回调验签失败/重放、超时取消与库存回补、桌码过期、并发 bind 仅一成功、出餐/取消释放桌台。
+- WebSocket 推送到达浏览器、OSS 直传、微信真机与小程序 E2E、Nginx/Docker 运行态。
 
 ## 9. 故障排查
 

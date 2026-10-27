@@ -23,15 +23,17 @@ import { defineConfig, devices } from '@playwright/test';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173';
 const IS_CI = Boolean(process.env.CI);
+const IS_REAL_MODE = process.env.E2E_MOCK === '0';
 const WEB_DIR = fileURLToPath(new URL('../web', import.meta.url));
 const USE_WEBSERVER = !process.env.E2E_BASE_URL && process.env.E2E_NO_WEBSERVER !== '1';
 const BROWSER_CHANNEL = process.env.E2E_BROWSER_CHANNEL || undefined;
 
 export default defineConfig({
   testDir: './tests',
-  // 业务链路（下单/支付/接单）存在真实写操作，默认串行，避免同一演示数据互相污染
+  // 业务链路（下单/支付/接单）存在真实写操作，默认串行，避免同一演示数据互相污染；
+  // 真后端模式再强制 1 worker：并发会触发登录 5 次/分钟限流并互相抢库存，导致假失败。
   fullyParallel: false,
-  workers: IS_CI ? 1 : undefined,
+  workers: IS_CI || IS_REAL_MODE ? 1 : undefined,
   forbidOnly: IS_CI,
   retries: IS_CI ? 1 : 0,
   timeout: 45_000,

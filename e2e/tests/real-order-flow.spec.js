@@ -21,13 +21,13 @@ import {
   apiLogin,
   backendBaseURL,
   createOrder,
-  fetchDishes,
   fetchMerchantStock,
   getOrder,
   isRealMode,
   loginViaRealUi,
   payOrder,
   pickSellableDish,
+  setDishStock,
   uniqueKey
 } from '../support/real-stack.js'
 
@@ -43,7 +43,10 @@ test.describe('真实后端 · 下单支付与商家流转', () => {
 
   test('顾客订单页 UI 完成模拟支付：PENDING_PAYMENT → PAID', async ({ page, request }) => {
     const customer = await apiLogin(request, DEMO.customer.username, DEMO.customer.password)
+    const merchant = await apiLogin(request, DEMO.merchant.username, DEMO.merchant.password)
     const dish = await pickSellableDish(request)
+    // 历史运行会持续扣减演示菜品库存；先重置到 100，避免库存耗尽导致假失败
+    await setDishStock(request, merchant.token, dish.id, 100)
     const created = await createOrder(request, customer.token, {
       dishId: dish.id,
       quantity: 1,
@@ -86,12 +89,15 @@ test.describe('真实后端 · 下单支付与商家流转', () => {
 
   test('商家订单看板 UI：接单 → 开始制作 → 出餐配送 → 完成订单', async ({ page, request }) => {
     const customer = await apiLogin(request, DEMO.customer.username, DEMO.customer.password)
+    const merchant = await apiLogin(request, DEMO.merchant.username, DEMO.merchant.password)
     const dish = await pickSellableDish(request)
+    await setDishStock(request, merchant.token, dish.id, 100)
     const created = await createOrder(request, customer.token, {
       dishId: dish.id,
       quantity: 2,
       remark: 'T19 E2E 商家流转'
     })
+    expect(created.body.code, JSON.stringify(created.body)).toBe(0)
     const order = created.body.data
     await payOrder(request, customer.token, { orderId: order.id })
 
@@ -150,7 +156,9 @@ test.describe('真实后端 · 下单支付与商家流转', () => {
 
   test('下单幂等重放：同一 Idempotency-Key 返回同一订单', async ({ request }) => {
     const customer = await apiLogin(request, DEMO.customer.username, DEMO.customer.password)
+    const merchant = await apiLogin(request, DEMO.merchant.username, DEMO.merchant.password)
     const dish = await pickSellableDish(request)
+    await setDishStock(request, merchant.token, dish.id, 100)
     const key = uniqueKey('idem')
     const payload = { dishId: dish.id, quantity: 1, remark: 'T19 E2E 幂等', key }
 
@@ -174,19 +182,11 @@ test.describe('真实后端 · 下单支付与商家流转', () => {
   test('库存不足 → 40901 且库存不变；取消订单回补库存', async ({ request }) => {
     const customer = await apiLogin(request, DEMO.customer.username, DEMO.customer.password)
     const merchant = await apiLogin(request, DEMO.merchant.username, DEMO.merchant.password)
-    // 数量校验上限为 99（>99 会先被 40001 拦下），因此选一个库存 3–98 的菜品用 stock+1 触发 40901
-    const data = await fetchDishes(request, { size: 50 })
-    const target = (data.list || []).find(
-      (item) =>
-        item.status === 'ON_SALE' &&
-        !item.soldOut &&
-        Number(item.stock || 0) >= 3 &&
-        Number(item.stock || 0) <= 98
-    )
-    test.skip(!target, '菜单中没有库存 3–98 的可售菜品，无法构造库存不足场景')
-    const dish = target
-    // 公开菜单有缓存快照，库存断言走商家端直读
+    const dish = await pickSellableDish(request)
+    // 库存设为 10，用 11 件触发 40901（数量校验上限 99，不会先被 40001 拦截）
+    await setDishStock(request, merchant.token, dish.id, 10)
     const stockBefore = await fetchMerchantStock(request, merchant.token, dish.id)
+    expect(stockBefore).toBe(10)
 
     const oversell = await createOrder(request, customer.token, {
       dishId: dish.id,
@@ -215,5 +215,7 @@ test.describe('真实后端 · 下单支付与商家流转', () => {
     expect(cancelBody.code, JSON.stringify(cancelBody)).toBe(0)
     expect(cancelBody.data.status).toBe('CANCELLED')
     expect(await fetchMerchantStock(request, merchant.token, dish.id)).toBe(stockBefore)
+    // 收尾：恢复演示菜品库存
+    await setDishStock(request, merchant.token, dish.id, 100)
   })
 })

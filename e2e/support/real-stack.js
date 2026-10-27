@@ -154,6 +154,22 @@ export async function fetchMerchantStock(request, token, dishId) {
 }
 
 /**
+ * 商家设置菜品库存（PUT /merchant/dishes/{id}/stock）。
+ * 真实用例会消耗/回补库存，先重置到固定值可避免历史运行把演示菜品扣到 0 后假失败；
+ * 不会伪造业务结果——库存仍由真实接口写入并被后续断言读取。
+ */
+export async function setDishStock(request, token, dishId, stock = 100) {
+  const response = await request.put(`${backendBaseURL()}${API}/merchant/dishes/${dishId}/stock`, {
+    headers: authHeaders(token),
+    data: { stock }
+  })
+  const body = await response.json()
+  expect(response.status(), JSON.stringify(body)).toBe(200)
+  expect(body.code, JSON.stringify(body)).toBe(0)
+  return Number(body.data.stock ?? stock)
+}
+
+/**
  * 创建外卖订单（幂等键由调用方决定，便于重放断言）。
  * 后端无收货地址接口，使用种子数据 addressId=1（customer id=3 的默认地址）。
  */

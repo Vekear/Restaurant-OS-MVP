@@ -17,9 +17,10 @@ import {
   tagTypeOf,
   labelOf
 } from '@/utils/constants'
-import { formatCurrency, formatDateTime } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 import { isRangeWithin, recentRange } from '@/utils/dateRange'
 import DataState from '@/components/DataState.vue'
+import MoneyText from '@/components/MoneyText.vue'
 import AdminOrderDrawer from '@/components/admin/AdminOrderDrawer.vue'
 
 const filters = reactive({
@@ -208,7 +209,7 @@ onMounted(load)
             </template>
           </el-table-column>
           <el-table-column label="实付" width="110" align="right">
-            <template #default="{ row }">{{ formatCurrency(row.payAmount) }}</template>
+            <template #default="{ row }"><MoneyText :value="row.payAmount" size="sm" /></template>
           </el-table-column>
           <el-table-column prop="itemCount" label="件数" width="70" align="center" />
           <el-table-column label="桌号" width="80">

@@ -76,10 +76,12 @@ export function uploadToOss(policy, file, onProgress) {
  * @param {File} file
  * @param {'dish'|'merchant'|'avatar'} bizType
  * @param {(percent:number)=>void} [onProgress]
+ * @param {(policy:object)=>void} [onPolicy] 供 UI 展示当前模式（local / oss）
  */
-export async function uploadImage(file, bizType, onProgress) {
+export async function uploadImage(file, bizType, onProgress, onPolicy) {
   const ext = (file.name.split('.').pop() || 'png').toLowerCase()
   const policy = await getFilePolicy({ bizType, ext })
+  if (typeof onPolicy === 'function') onPolicy(policy)
 
   if (policy?.uploadMode === 'direct') {
     await uploadToOss(policy, file, onProgress)

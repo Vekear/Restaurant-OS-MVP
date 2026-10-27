@@ -4,14 +4,17 @@
  * 2. public 页面直接放行；guestOnly 页面登录后跳回自身空间
  * 3. 未登录访问受保护页面 → /login?redirect=...
  * 4. meta.roles 与当前角色不匹配 → /403
+ *
+ * `createAuthBeforeEach` / `createTitleAfterEach` 独立导出，便于单元测试直接断言守卫返回值。
  */
 import { useAuthStore } from '@/stores/auth'
 import { safeRedirect } from '@/utils/redirect'
 
 const APP_TITLE = import.meta.env.VITE_APP_TITLE || '拾味点餐'
 
-export function setupRouterGuards(router) {
-  router.beforeEach(async (to) => {
+/** 生成 beforeEach 守卫（每次导航调用，内部按需取当前 Pinia 中的 auth store） */
+export function createAuthBeforeEach() {
+  return async (to) => {
     const auth = useAuthStore()
 
     if (auth.isLoggedIn && !auth.user) {
@@ -39,11 +42,19 @@ export function setupRouterGuards(router) {
     }
 
     return true
-  })
+  }
+}
 
-  router.afterEach((to) => {
+/** 生成 afterEach 守卫：统一写入页面标题 */
+export function createTitleAfterEach() {
+  return (to) => {
     document.title = to.meta.title ? `${to.meta.title} · ${APP_TITLE}` : APP_TITLE
-  })
+  }
+}
+
+export function setupRouterGuards(router) {
+  router.beforeEach(createAuthBeforeEach())
+  router.afterEach(createTitleAfterEach())
 }
 
 export default setupRouterGuards

@@ -1,14 +1,14 @@
 <script setup>
 /**
  * 商家菜品新建/编辑弹窗（docs/02-api.md §16）
- * - 图片走 UploadImage（/files/policy + /files/upload，OSS 直传自动降级）
+ * - 图片走 ImageUploader（/files/policy + /files/upload，OSS 直传自动降级）
  * - 校验：名称 2–50、价格 0.01–9999.99、原价 ≥ 售价、库存 0–99999、排序 0–999
  */
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createDish, updateDish } from '@/api/merchantDishes'
 import { DISH_STATUS, DISH_STATUS_LABELS } from '@/utils/constants'
-import UploadImage from '@/components/UploadImage.vue'
+import ImageUploader from '@/components/ImageUploader.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -206,7 +206,7 @@ function close() {
         </el-form-item>
       </div>
       <el-form-item label="菜品图片">
-        <UploadImage v-model="form.imageUrl" biz-type="dish" />
+        <ImageUploader v-model="form.imageUrl" biz-type="dish" />
       </el-form-item>
       <el-form-item label="菜品描述" prop="description">
         <el-input

@@ -6,7 +6,6 @@
  * - meta.public     无需登录即可访问
  * - meta.guestOnly  已登录用户访问时跳回自己的 homePath（登录/注册页）
  * - meta.roles      RBAC 允许的角色（子路由自动合并父级 meta）
- * - meta.phase / planned  占位页展示的所属阶段与计划能力
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import AdminLayout from '@/layouts/AdminLayout.vue'
@@ -27,13 +26,17 @@ const MerchantOrders = () => import('@/views/merchant/Orders.vue')
 const MerchantDishes = () => import('@/views/merchant/Dishes.vue')
 const MerchantTables = () => import('@/views/merchant/Tables.vue')
 const MerchantStats = () => import('@/views/merchant/Stats.vue')
+const AdminDashboard = () => import('@/views/admin/Dashboard.vue')
+const AdminUsers = () => import('@/views/admin/Users.vue')
+const AdminMerchants = () => import('@/views/admin/Merchants.vue')
+const AdminOrders = () => import('@/views/admin/Orders.vue')
+const AdminCoupons = () => import('@/views/admin/Coupons.vue')
+const AdminAudit = () => import('@/views/admin/Audit.vue')
+const AdminStats = () => import('@/views/admin/Stats.vue')
 const Login = () => import('@/views/auth/Login.vue')
 const Register = () => import('@/views/auth/Register.vue')
-const Placeholder = () => import('@/views/common/Placeholder.vue')
 const Forbidden = () => import('@/views/common/Forbidden.vue')
 const NotFound = () => import('@/views/common/NotFound.vue')
-
-const T14 = '阶段 5 · T14'
 
 const routes = [
   {
@@ -209,106 +212,64 @@ const routes = [
       {
         path: 'dashboard',
         name: 'admin-dashboard',
-        component: Placeholder,
+        component: AdminDashboard,
         meta: {
           title: '平台概览',
-          description: '全平台用户、商家、订单与营收核心指标。',
-          phase: T14,
-          planned: [
-            { title: '平台指标', desc: '用户数、商家数、订单量与成交额' },
-            { title: '商家排行', desc: '按营收与订单量排序的商家榜' },
-            { title: '趋势图表', desc: 'ECharts 展示平台整体走势' }
-          ]
+          description: '全平台用户、商家、订单与营收核心指标。'
         }
       },
       {
         path: 'users',
         name: 'admin-users',
-        component: Placeholder,
+        component: AdminUsers,
         meta: {
           title: '用户管理',
-          description: '顾客与商家账号检索、角色调整与禁用。',
-          phase: T14,
-          planned: [
-            { title: '用户检索', desc: '用户名、手机号、角色筛选' },
-            { title: '角色分配', desc: 'RBAC 角色变更与权限校验' },
-            { title: '状态管理', desc: '启用 / 禁用与操作记录' }
-          ]
+          description: '全部账号检索、启用 / 禁用与审计留痕。'
         }
       },
       {
         path: 'merchants',
         name: 'admin-merchants',
-        component: Placeholder,
+        component: AdminMerchants,
         meta: {
           title: '商家管理',
-          description: '商家入驻审核、营业状态与店铺信息。',
-          phase: T14,
-          planned: [
-            { title: '入驻审核', desc: '资质信息查看与通过 / 驳回' },
-            { title: '营业状态', desc: '营业中 / 休息中 与平台强制下架' },
-            { title: '店铺详情', desc: '店铺信息、菜品与订单概览' }
-          ]
+          description: '入驻审核、平台停启用与店铺信息查询。'
         }
       },
       {
         path: 'orders',
         name: 'admin-orders',
-        component: Placeholder,
+        component: AdminOrders,
         meta: {
           title: '订单管理',
-          description: '全平台订单检索、状态追踪与异常处理。',
-          phase: T14,
-          planned: [
-            { title: '订单检索', desc: '按订单号、商家、状态与时间范围筛选' },
-            { title: '状态追踪', desc: '查看双状态机流转历史' },
-            { title: '异常处理', desc: '退款、取消与人工纠正' }
-          ]
+          description: '全平台订单检索、详情追踪与 Excel 导出。'
         }
       },
       {
         path: 'coupons',
         name: 'admin-coupons',
-        component: Placeholder,
+        component: AdminCoupons,
         meta: {
           title: '优惠券',
-          description: '券模板、发放与核销统计。',
-          phase: T14,
-          planned: [
-            { title: '券模板', desc: '满减 / 折扣、有效期与库存' },
-            { title: '定向发放', desc: '按用户或商家发放优惠券' },
-            { title: '核销统计', desc: '领取、使用与过期数据' }
-          ]
+          description: '券模板维护、发放量控制与停用管理。'
         }
       },
       {
         path: 'audit',
         name: 'admin-audit',
-        component: Placeholder,
+        component: AdminAudit,
         meta: {
           title: '审计日志',
-          description: '关键操作留痕，支持按操作者与时间检索。',
-          phase: T14,
-          planned: [
-            { title: '日志列表', desc: '操作人、动作、目标与时间' },
-            { title: '检索筛选', desc: '按模块与关键字过滤' },
-            { title: '详情快照', desc: '请求前后数据对比（脱敏）' }
-          ]
+          description: '关键操作留痕，支持按动作、操作人与时间检索。'
         }
       },
       {
         path: 'stats',
         name: 'admin-stats',
-        component: Placeholder,
+        component: AdminStats,
         meta: {
           title: '数据报表',
-          description: '跨商家营收分析、导出与对账。',
-          phase: T14,
-          planned: [
-            { title: '平台营收', desc: '商家维度的成交额与退款额' },
-            { title: '对比分析', desc: '同比 / 环比与品类结构' },
-            { title: '报表导出', desc: 'POI 导出 Excel 并记录导出审计' }
-          ]
+          description: '平台营收、订单趋势、热销菜品与报表导出。'
         }
       }
     ]

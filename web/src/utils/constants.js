@@ -249,6 +249,16 @@ export const MERCHANT_AUDIT_STATUS_TAG_TYPES = Object.freeze({
   REJECTED: 'danger'
 })
 
+export const MERCHANT_STATUS_LABELS = Object.freeze({
+  ENABLED: '启用',
+  DISABLED: '禁用'
+})
+
+export const MERCHANT_STATUS_TAG_TYPES = Object.freeze({
+  ENABLED: 'success',
+  DISABLED: 'danger'
+})
+
 /* ===================== WebSocket 事件（02-api §14.2） ===================== */
 
 export const WS_EVENT_TYPE = Object.freeze({

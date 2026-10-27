@@ -17,9 +17,18 @@ const props = defineProps({
 
 const emit = defineEmits(['done', 'refresh'])
 
-const running = ref('')
+const running = ref(null)
 
 const actions = computed(() => buildOrderActions(props.order))
+
+/**
+ * 按钮禁用判定：基准确（外部 disabled）+ 执行中只保留当前动作可点。
+ * 注意：running 空闲态必须是 null（而非 ''），否则 el-button 的 Boolean prop 会把空串 cast 成 true。
+ */
+function isActionDisabled(action) {
+  const isBusy = running.value !== null
+  return props.disabled || (isBusy && running.value !== action.key)
+}
 
 function confirmText(action) {
   if (action.key === 'complete') return '完成后订单进入终态，且堂食单会同时关闭桌台会话，确认继续？'
@@ -75,7 +84,7 @@ async function run(action) {
       ElMessage.error(error?.message || '操作失败，请稍后重试')
     }
   } finally {
-    running.value = ''
+    running.value = null
   }
 }
 </script>
@@ -89,7 +98,7 @@ async function run(action) {
       :plain="action.plain"
       :size="size"
       :loading="running === action.key"
-      :disabled="disabled || (running && running !== action.key)"
+      :disabled="isActionDisabled(action)"
       @click="run(action)"
     >
       {{ action.label }}

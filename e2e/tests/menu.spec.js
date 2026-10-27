@@ -22,6 +22,7 @@ import {
 } from '../support/api-mocks.js'
 
 test.describe('菜单页', () => {
+  test.skip(isRealMode(), 'mock 驱动用例：真实栈模式只运行 real-*.spec.js')
   /** @type {ReturnType<typeof collectApiRequests>} */
   let requests
   /** @type {Awaited<ReturnType<typeof installApiMocks>> | null} */

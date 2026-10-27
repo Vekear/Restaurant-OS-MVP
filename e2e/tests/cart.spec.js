@@ -35,6 +35,7 @@ const KUNG_PAO = dishOf('宫保鸡丁') // 28.00
 const YU_XIANG = dishOf('鱼香肉丝') // 31.00
 
 test.describe('购物车', () => {
+  test.skip(isRealMode(), 'mock 驱动用例：真实栈模式只运行 real-*.spec.js')
   /** @type {ReturnType<typeof collectApiRequests>} */
   let requests
   /** @type {Awaited<ReturnType<typeof installApiMocks>> | null} */

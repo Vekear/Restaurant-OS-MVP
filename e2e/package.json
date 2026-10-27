@@ -12,6 +12,8 @@
     "test:smoke": "playwright test tests/auth.spec.js tests/menu.spec.js",
     "test:auth": "playwright test tests/auth.spec.js",
     "test:cart": "playwright test tests/cart.spec.js",
+    "test:merchant": "playwright test tests/merchant-orders.spec.js",
+    "test:admin": "playwright test tests/admin-dashboard.spec.js",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",

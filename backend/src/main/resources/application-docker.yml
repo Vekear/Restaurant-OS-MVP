@@ -1,0 +1,31 @@
+# =====================================================================
+# docker：docker compose 环境（服务名 mysql / redis，由 SPRING_PROFILES_ACTIVE=docker 激活）
+# 不写入任何真实密钥，全部来自环境变量（deploy/.env）
+# =====================================================================
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:restaurant_mvp}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    hikari:
+      maximum-pool-size: 20
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.restaurant: INFO
+
+app:
+  storage:
+    local:
+      root: ${STORAGE_LOCAL_DIR:/app/storage/files}
+  wechat:
+    mock: ${WECHAT_MOCK:true}
+  task:
+    enabled: ${TASK_ENABLED:true}

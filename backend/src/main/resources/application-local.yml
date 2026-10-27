@@ -1,0 +1,31 @@
+# =====================================================================
+# local：本地开发（默认 profile）
+# MySQL/Redis 均在本机，Flyway 自动迁移，模拟支付/微信 mock 开启
+# MySQL 由 Lead 启动，账号 root/123456，库 restaurant_mvp
+# =====================================================================
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:restaurant_mvp}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+  flyway:
+    # 本地允许手工 clean 后重建
+    clean-disabled: false
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.restaurant: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web.socket: INFO
+    org.flywaydb: INFO
+
+app:
+  payment:
+    mock-charge-amount: 0.01
+  wechat:
+    mock: true
+  task:
+    enabled: true

@@ -1,0 +1,17 @@
+# Dockerfile 专用 dockerignore（BuildKit: deploy/web/Dockerfile.dockerignore）
+# 构建上下文 = 仓库根目录；web 构建只需要 web/ 源码，避免复制 node_modules/target/.env。
+.git
+.agent-teams
+.runtime
+.idea
+.vscode
+.env
+.env.*
+node_modules
+**/node_modules
+**/target
+backend
+miniprogram
+e2e
+docs
+*.md

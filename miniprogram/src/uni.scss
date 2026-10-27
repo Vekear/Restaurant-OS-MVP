@@ -1,0 +1,53 @@
+/**
+ * 全局设计令牌（uni.scss 由 uni-app 自动注入到每个页面的 scss 中）。
+ * 颜色 / 圆角 / 阴影 / 间距统一在此维护。
+ */
+
+/* 品牌色 */
+$color-brand: #ff6b35;
+$color-brand-dark: #e8501f;
+$color-brand-light: #ff8a5c;
+$color-brand-soft: #fff1e9;
+$color-accent: #ffb703;
+$color-accent-soft: #fff7e0;
+
+/* 文本 */
+$color-text: #1f1a17;
+$color-text-secondary: #5c514b;
+$color-text-muted: #8a7f79;
+$color-text-inverse: #ffffff;
+
+/* 背景与描边 */
+$color-bg: #fff8f3;
+$color-card: #ffffff;
+$color-border: #f0e6df;
+$color-placeholder-bg: #f4ece6;
+$color-success: #2f9e6f;
+$color-danger: #e5484d;
+
+/* 圆角 */
+$radius-sm: 8rpx;
+$radius-md: 16rpx;
+$radius-lg: 24rpx;
+$radius-xl: 32rpx;
+$radius-pill: 999rpx;
+
+/* 阴影 */
+$shadow-card: 0 8rpx 28rpx rgba(58, 36, 24, 0.06);
+$shadow-float: 0 16rpx 40rpx rgba(58, 36, 24, 0.14);
+$shadow-brand: 0 12rpx 28rpx rgba(255, 107, 53, 0.28);
+
+/* 间距 */
+$space-xs: 8rpx;
+$space-sm: 16rpx;
+$space-md: 24rpx;
+$space-lg: 32rpx;
+$space-xl: 48rpx;
+
+/* 字号 */
+$font-xs: 22rpx;
+$font-sm: 24rpx;
+$font-md: 28rpx;
+$font-lg: 32rpx;
+$font-xl: 40rpx;
+$font-xxl: 48rpx;

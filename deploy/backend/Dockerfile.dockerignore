@@ -1,0 +1,18 @@
+# Dockerfile 专用 dockerignore（BuildKit: deploy/backend/Dockerfile.dockerignore）
+# 构建上下文 = 仓库根目录；仅保留 backend 构建所需文件，避免把 node_modules/target/.env 送进 daemon。
+.git
+.agent-teams
+.runtime
+.idea
+.vscode
+.env
+.env.*
+node_modules
+**/node_modules
+**/target
+**/dist
+web
+miniprogram
+e2e
+docs
+*.md

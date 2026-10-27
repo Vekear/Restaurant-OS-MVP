@@ -1,0 +1,38 @@
+# =====================================================================
+# test：自动化测试 profile（restaurant_mvp_test + Redis db15，关闭定时任务）
+# 由 @ActiveProfiles("test") 或 SPRING_PROFILES_ACTIVE=test 激活
+# =====================================================================
+spring:
+  datasource:
+    url: jdbc:mysql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:3306}/${TEST_DB_NAME:restaurant_mvp_test}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  data:
+    redis:
+      database: 15
+  flyway:
+    clean-disabled: false
+    # 测试库允许每次启动重建（由测试基类决定是否 clean）
+    baseline-on-migrate: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.restaurant: DEBUG
+    org.springframework.web: INFO
+
+app:
+  storage:
+    local:
+      root: ./target/test-storage/files
+  payment:
+    mock-charge-amount: 0.01
+  wechat:
+    mock: true
+  task:
+    enabled: false

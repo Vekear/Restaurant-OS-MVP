@@ -1,0 +1,226 @@
+# =====================================================================
+# 餐厅点餐 MVP — 后端公共配置（默认值面向本地开发）
+# 运行环境通过 Spring Profile 覆盖：local（默认）/ test / docker
+# 环境变量命名与 deploy/.env.example 对齐，见各配置项后的 ${ENV:default}
+# 业务配置前缀 app.* 与 docs/01-architecture.md §16.9 一一对应
+# =====================================================================
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  error:
+    include-message: always
+    include-stacktrace: never
+    whitelabel:
+      enabled: false
+
+spring:
+  application:
+    name: restaurant-backend
+  profiles:
+    # 未显式激活 profile 时使用 local；docker 环境通过 SPRING_PROFILES_ACTIVE=docker 覆盖
+    default: local
+  main:
+    banner-mode: off
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: always
+  mvc:
+    problemdetails:
+      enabled: false
+  servlet:
+    multipart:
+      enabled: true
+      # 容器上限略大于业务上限（app.upload.max-size=5MB），保证超限时由业务层返回 40003
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:6MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:8MB}
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:restaurant_mvp}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: restaurant-hikari
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3s
+      connect-timeout: 3s
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_schema_history
+    baseline-on-migrate: true
+    baseline-version: 0
+    baseline-description: "baseline"
+    validate-on-migrate: true
+    clean-disabled: true
+    encoding: UTF-8
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    jdbc-type-for-null: 'NULL'
+  global-config:
+    banner: false
+    db-config:
+      # T03 DDL 使用物理删除，无 deleted 列，因此不启用逻辑删除
+      id-type: auto
+
+# ---------------------------------------------------------------------
+# API 文档（SpringDoc / Swagger UI）
+# ---------------------------------------------------------------------
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    display-request-duration: true
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+
+# ---------------------------------------------------------------------
+# 运维端点（仅暴露 health/info；健康详情按 profile 区分）
+# ---------------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: 餐厅点餐系统 MVP 后端
+    version: 0.1.0-SNAPSHOT
+
+# ---------------------------------------------------------------------
+# 业务配置（AppProperties，前缀 app）—— 对齐 docs/01-architecture.md §16.9
+# ---------------------------------------------------------------------
+app:
+  version: 0.1.0-SNAPSHOT
+
+  cors:
+    # Web 前端（Vite dev server）与小程序 H5 调试端口；Spring 使用 pattern 语法
+    allowed-origin-patterns:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+      - http://localhost:5174
+      - http://127.0.0.1:5174
+    max-age-seconds: 3600
+
+  jwt:
+    # HS256 开发默认值，生产必须通过 JWT_SECRET 覆盖（>= 32 字节）
+    secret: ${JWT_SECRET:restaurant-mvp-dev-only-jwt-secret-please-change-0123456789}
+    expire-minutes: ${JWT_EXPIRE_MINUTES:120}
+    issuer: restaurant-mvp
+
+  payment:
+    # 模拟支付：页面展示真实应付金额，实际扣款 0.01 元（演示环境）
+    mock-charge-amount: ${PAYMENT_MOCK_CHARGE_AMOUNT:0.01}
+    mock-callback-base-url: ${PAYMENT_MOCK_CALLBACK_BASE_URL:http://127.0.0.1:8080}
+    callback-secret: ${PAYMENT_CALLBACK_SECRET:restaurant-mvp-dev-only-pay-secret-0123456789}
+    callback-allowed-clock-skew-seconds: ${PAYMENT_CALLBACK_CLOCK_SKEW_SECONDS:300}
+
+  order:
+    # 待支付订单超时取消：15 分钟，每分钟扫描一次
+    payment-timeout-minutes: ${ORDER_PAYMENT_TIMEOUT_MINUTES:15}
+    timeout-scan-cron: ${ORDER_TIMEOUT_SCAN_CRON:0 * * * * ?}
+
+  table:
+    # 桌台二维码 HMAC-SHA256 签名密钥，生产必须通过 TABLE_QR_SECRET 覆盖
+    qr-secret: ${TABLE_QR_SECRET:restaurant-mvp-dev-only-table-qr-secret-0123456789}
+    session-expire-minutes: ${TABLE_SESSION_EXPIRE_MINUTES:120}
+    session-cleanup-cron: ${TABLE_SESSION_CLEANUP_CRON:0 */5 * * * ?}
+
+  storage:
+    # local | oss；OSS 未配置（endpoint/bucket/ak/sk 任一为空）时自动降级 local
+    type: ${STORAGE_TYPE:local}
+    local:
+      root: ${STORAGE_LOCAL_DIR:.runtime/storage/files}
+      url-prefix: ${STORAGE_URL_PREFIX:/files}
+    oss:
+      endpoint: ${OSS_ENDPOINT:}
+      bucket: ${OSS_BUCKET:}
+      access-key-id: ${OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+      dir: ${OSS_DIR:biz/}
+      expire-seconds: ${OSS_POST_EXPIRE_SECONDS:300}
+      public-base-url: ${OSS_PUBLIC_BASE_URL:}
+
+  upload:
+    max-size: ${UPLOAD_MAX_SIZE:5MB}
+    allowed-content-types:
+      - image/jpeg
+      - image/png
+      - image/webp
+
+  wechat:
+    # 无真实 AppID/Secret 时开启 mock，小程序登录走可用的降级通道
+    mock: ${WECHAT_MOCK:true}
+    app-id: ${WECHAT_APP_ID:}
+    app-secret: ${WECHAT_APP_SECRET:}
+    code2session-url: ${WECHAT_CODE2SESSION_URL:https://api.weixin.qq.com/sns/jscode2session}
+
+  cache:
+    menu-ttl-minutes: ${MENU_CACHE_TTL_MINUTES:10}
+
+  rate-limit:
+    login-per-minute: ${RATE_LIMIT_LOGIN:5}
+    payment-per-minute: ${RATE_LIMIT_PAYMENT:10}
+    api-per-minute: ${RATE_LIMIT_API:120}
+
+  task:
+    # Spring Task 总开关（测试 profile 关闭，避免后台任务干扰断言）
+    enabled: ${TASK_ENABLED:true}
+
+# ---------------------------------------------------------------------
+# 日志（MDC traceId 由 TraceIdFilter 注入）
+# ---------------------------------------------------------------------
+logging:
+  charset:
+    console: UTF-8
+  level:
+    root: INFO
+    com.restaurant: INFO
+    org.springframework.web: INFO
+    com.baomidou.mybatisplus: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{traceId:-}] %logger{40} - %msg%n"

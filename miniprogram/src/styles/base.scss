@@ -1,0 +1,110 @@
+/* 全局基础样式（App.vue 引入，作用于所有页面） */
+
+page {
+  background-color: $color-bg;
+  color: $color-text;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: $font-md;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+view,
+text,
+input,
+textarea,
+scroll-view,
+image,
+button {
+  box-sizing: border-box;
+}
+
+button {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  line-height: inherit;
+  font-size: inherit;
+
+  &::after {
+    border: none;
+  }
+}
+
+.page {
+  min-height: 100vh;
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.card {
+  background: $color-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+}
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 $space-lg;
+  margin: $space-lg 0 $space-sm;
+}
+
+.section-title__main {
+  font-size: $font-lg;
+  font-weight: 700;
+  color: $color-text;
+}
+
+.section-title__extra {
+  font-size: $font-sm;
+  color: $color-text-muted;
+}
+
+.price {
+  display: inline-flex;
+  align-items: baseline;
+  color: $color-brand;
+  font-weight: 700;
+}
+
+.price__symbol {
+  font-size: $font-xs;
+  margin-right: 2rpx;
+}
+
+.price__amount {
+  font-size: 34rpx;
+  letter-spacing: -0.5rpx;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  padding: 0 $space-lg;
+  border-radius: $radius-pill;
+  background: linear-gradient(135deg, $color-brand, $color-brand-dark);
+  color: $color-text-inverse;
+  font-size: $font-lg;
+  font-weight: 600;
+  box-shadow: $shadow-brand;
+
+  &--ghost {
+    background: $color-brand-soft;
+    color: $color-brand;
+    box-shadow: none;
+  }
+
+  &--disabled {
+    background: #d9cfc9;
+    box-shadow: none;
+    color: #ffffff;
+  }
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

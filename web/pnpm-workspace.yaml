@@ -1,0 +1,13 @@
+# pnpm 12 起安装期设置不再读取 package.json 的 pnpm 字段，统一放在 pnpm-workspace.yaml。
+#
+# allowBuilds：放行依赖的安装脚本，否则 pnpm install 会以 ERR_PNPM_IGNORED_BUILDS 失败。
+#   - esbuild：Vite 的构建引擎（校验平台二进制）
+#   - vue-demi：Element Plus -> @vueuse/core 的间接依赖（切换 Vue 3 产物）
+allowBuilds:
+  esbuild: true
+  vue-demi: true
+
+# 本机 pnpm 开启了 supply-chain minimumReleaseAge 策略，
+# axios@1.21.0 属于新版本，显式豁免以锁定团队约定的依赖版本。
+minimumReleaseAgeExclude:
+  - axios@1.21.0

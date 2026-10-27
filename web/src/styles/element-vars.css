@@ -1,0 +1,136 @@
+/**
+ * Element Plus 主题变量映射
+ * 目标：Element 组件配色 / 圆角 / 字号全部落到 tokens.css 的令牌上。
+ * 注意：本文件必须在 element-plus/dist/index.css 之后引入。
+ */
+
+:root {
+  /* 主色（辣椒橙） */
+  --el-color-primary: var(--color-brand-500);
+  --el-color-primary-light-1: #e76843;
+  --el-color-primary-light-2: #e97958;
+  --el-color-primary-light-3: #ec896d;
+  --el-color-primary-light-4: #efa98f;
+  --el-color-primary-light-5: #f2ab96;
+  --el-color-primary-light-6: #f5c2b2;
+  --el-color-primary-light-7: #f7cdc0;
+  --el-color-primary-light-8: #faddd5;
+  --el-color-primary-light-9: #fceeea;
+  --el-color-primary-dark-2: #b64625;
+
+  /* 成功 */
+  --el-color-success: var(--color-success);
+  --el-color-success-light-3: #6dbb97;
+  --el-color-success-light-5: #97cfb5;
+  --el-color-success-light-8: #d5ece1;
+  --el-color-success-light-9: #eaf5f0;
+  --el-color-success-dark-2: #257e56;
+
+  /* 警告 */
+  --el-color-warning: var(--color-warning);
+  --el-color-warning-light-3: #ebb86b;
+  --el-color-warning-light-5: #f1cd95;
+  --el-color-warning-light-8: #f9ebd5;
+  --el-color-warning-light-9: #fcf5ea;
+  --el-color-warning-dark-2: #b67b22;
+
+  /* 危险 */
+  --el-color-danger: var(--color-danger);
+  --el-color-danger-light-3: #e27d7d;
+  --el-color-danger-light-5: #eba2a2;
+  --el-color-danger-light-8: #f7dada;
+  --el-color-danger-light-9: #fbecec;
+  --el-color-danger-dark-2: #ab3737;
+  --el-color-error: var(--color-danger);
+
+  /* 信息 */
+  --el-color-info: var(--color-info);
+  --el-color-info-light-3: #8ca2b8;
+  --el-color-info-light-5: #adbdcb;
+  --el-color-info-light-8: #dee4eb;
+  --el-color-info-light-9: #eff2f5;
+  --el-color-info-dark-2: #48617a;
+
+  /* 文本 */
+  --el-text-color-primary: var(--color-text-primary);
+  --el-text-color-regular: var(--color-text-secondary);
+  --el-text-color-secondary: var(--color-text-tertiary);
+  --el-text-color-placeholder: var(--color-text-tertiary);
+  --el-text-color-disabled: var(--color-text-disabled);
+
+  /* 背景与填充 */
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-bg-page);
+  --el-bg-color-overlay: var(--color-surface);
+  --el-fill-color: var(--color-bg-subtle);
+  --el-fill-color-light: #f6f2ec;
+  --el-fill-color-lighter: #faf7f3;
+  --el-fill-color-blank: #ffffff;
+
+  /* 边框 */
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border-subtle);
+  --el-border-color-lighter: var(--color-border-subtle);
+  --el-border-color-extra-light: #f5f0e9;
+  --el-border-color-hover: var(--color-border-strong);
+
+  /* 圆角 */
+  --el-border-radius-base: var(--radius-sm);
+  --el-border-radius-small: var(--radius-xs);
+  --el-border-radius-round: var(--radius-pill);
+
+  /* 字体 */
+  --el-font-family: var(--font-family-base);
+  --el-font-size-base: var(--font-size-md);
+  --el-font-size-small: var(--font-size-sm);
+  --el-font-size-extra-small: var(--font-size-xs);
+  --el-font-size-medium: var(--font-size-lg);
+  --el-font-size-large: var(--font-size-xl);
+
+  /* 阴影 */
+  --el-box-shadow: var(--shadow-md);
+  --el-box-shadow-light: var(--shadow-sm);
+  --el-box-shadow-lighter: var(--shadow-xs);
+  --el-box-shadow-dark: var(--shadow-lg);
+
+  /* 遮罩 */
+  --el-mask-color: rgba(255, 253, 251, 0.72);
+  --el-overlay-color-lighter: var(--color-overlay);
+}
+
+/* Element 组件的细节统一 */
+.el-button {
+  font-weight: var(--font-weight-medium);
+  transition: all var(--duration-base) var(--ease-standard);
+}
+
+.el-button--primary:not(.is-text):not(.is-link) {
+  box-shadow: var(--shadow-xs);
+}
+
+.el-card {
+  --el-card-border-radius: var(--radius-lg);
+  --el-card-border-color: var(--color-border-subtle);
+  --el-card-padding: var(--space-6);
+  box-shadow: var(--shadow-xs);
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: var(--radius-sm);
+}
+
+.el-dialog {
+  --el-dialog-border-radius: var(--radius-lg);
+}
+
+.el-message {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.el-tag {
+  border-radius: var(--radius-xs);
+  font-weight: var(--font-weight-medium);
+}

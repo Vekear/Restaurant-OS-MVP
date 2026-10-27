@@ -1,0 +1,22 @@
+{
+  "name": "restaurant-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "餐厅点餐系统 MVP（外卖 Web + 堂食微信小程序 UniApp + Spring Boot 3 后端 + MySQL/Redis/Nginx）——根仓库脚本入口",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local.ps1",
+    "dev:nginx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local.ps1 -WithNginx",
+    "dev:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local.ps1 -Stop",
+    "smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.ps1",
+    "smoke:gateway": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -GatewayUrl http://127.0.0.1",
+    "openapi:export": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/export-openapi.ps1",
+    "compose:check": "node scripts/check-compose.mjs",
+    "compose:up": "docker compose up -d --build",
+    "compose:down": "docker compose down",
+    "compose:ps": "docker compose ps",
+    "compose:logs": "docker compose logs -f --tail=200"
+  }
+}

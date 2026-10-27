@@ -1,0 +1,164 @@
+/**
+ * 拾味点餐 · 设计令牌（Design Tokens）
+ * 所有颜色 / 间距 / 圆角 / 阴影 / 字号 / 动效的唯一来源。
+ * 页面与组件只允许引用这里的 var(--*)，禁止硬编码色值。
+ */
+
+:root {
+  /* ============ 品牌色 · 辣椒橙 ============ */
+  --color-brand-50: #fff3ec;
+  --color-brand-100: #ffe1d1;
+  --color-brand-200: #ffc3a6;
+  --color-brand-300: #ff9c73;
+  --color-brand-400: #fb7748;
+  --color-brand-500: #e4572e;
+  --color-brand-600: #c8441f;
+  --color-brand-700: #a53518;
+  --color-brand-800: #7f2a15;
+  --color-brand-900: #5c1f11;
+
+  /* 辅助色 · 姜黄 */
+  --color-accent-100: #fdf0d8;
+  --color-accent-300: #f6c56e;
+  --color-accent-500: #e39a2b;
+  --color-accent-700: #b67b22;
+
+  /* ============ 语义色 ============ */
+  --color-primary: var(--color-brand-500);
+  --color-primary-hover: var(--color-brand-400);
+  --color-primary-active: var(--color-brand-600);
+  --color-primary-soft: var(--color-brand-50);
+
+  --color-success: #2e9e6b;
+  --color-success-soft: #eaf5f0;
+  --color-warning: #e39a2b;
+  --color-warning-soft: #fcf5ea;
+  --color-danger: #d64545;
+  --color-danger-soft: #fbecec;
+  --color-info: #5b7a99;
+  --color-info-soft: #eff2f5;
+
+  /* ============ 中性色（暖灰） ============ */
+  --color-bg-page: #f7f4f0;
+  --color-bg-subtle: #f1ece5;
+  --color-bg-elevated: #ffffff;
+  --color-bg-inverse: #221c17;
+
+  --color-surface: #ffffff;
+  --color-surface-hover: #faf7f3;
+  --color-overlay: rgba(34, 28, 23, 0.45);
+
+  --color-text-primary: #221c17;
+  --color-text-secondary: #6b6159;
+  --color-text-tertiary: #9a8f85;
+  --color-text-disabled: #c4bbb2;
+  --color-text-inverse: #fffdfb;
+  --color-text-on-brand: #ffffff;
+
+  --color-border: #e7e0d7;
+  --color-border-subtle: #f0eae2;
+  --color-border-strong: #d5cbc0;
+
+  /* 控制台侧栏（商家=暖褐，管理=墨青） */
+  --color-sider-merchant: #2a211c;
+  --color-sider-merchant-hover: #3a2f28;
+  --color-sider-admin: #1c2430;
+  --color-sider-admin-hover: #2a3542;
+  --color-sider-text: #cfc5bb;
+  --color-sider-text-active: #fffdfb;
+
+  /* ============ 间距（4 的倍数） ============ */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 40px;
+  --space-11: 48px;
+  --space-12: 64px;
+
+  /* ============ 圆角 ============ */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* ============ 阴影 ============ */
+  --shadow-xs: 0 1px 2px rgba(34, 28, 23, 0.05);
+  --shadow-sm: 0 2px 8px rgba(34, 28, 23, 0.06);
+  --shadow-md: 0 8px 24px rgba(34, 28, 23, 0.08);
+  --shadow-lg: 0 16px 40px rgba(34, 28, 23, 0.12);
+  --shadow-xl: 0 24px 64px rgba(34, 28, 23, 0.16);
+  --shadow-brand: 0 8px 20px rgba(228, 87, 46, 0.24);
+  --shadow-focus: 0 0 0 3px rgba(228, 87, 46, 0.18);
+
+  /* ============ 字体 ============ */
+  --font-family-base: 'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans SC', 'Helvetica Neue', Arial, sans-serif;
+  --font-family-number: 'DIN Alternate', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 22px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 36px;
+  --font-size-5xl: 46px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-base: 1.6;
+  --line-height-loose: 1.8;
+
+  /* ============ 布局 ============ */
+  --layout-max-width: 1200px;
+  --layout-header-height: 64px;
+  --layout-sider-width: 232px;
+  --layout-sider-collapsed-width: 64px;
+  --layout-content-padding: var(--space-8);
+  --layout-gap: var(--space-6);
+
+  /* ============ 动效 ============ */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ============ 层级 ============ */
+  --z-base: 1;
+  --z-sticky: 100;
+  --z-header: 200;
+  --z-overlay: 300;
+  --z-modal: 2000;
+  --z-toast: 3000;
+}
+
+/* 控制台主题：只切换侧栏与强调色，其余令牌复用 */
+.theme-merchant {
+  --console-accent: var(--color-brand-500);
+  --console-accent-soft: rgba(228, 87, 46, 0.14);
+  --console-sider-bg: var(--color-sider-merchant);
+  --console-sider-hover: var(--color-sider-merchant-hover);
+}
+
+.theme-admin {
+  --console-accent: #7aa2c8;
+  --console-accent-soft: rgba(122, 162, 200, 0.16);
+  --console-sider-bg: var(--color-sider-admin);
+  --console-sider-hover: var(--color-sider-admin-hover);
+}

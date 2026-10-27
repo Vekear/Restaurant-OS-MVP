@@ -36,6 +36,8 @@ public class AppProperties {
 
     private final Order order = new Order();
 
+    private final Idempotency idempotency = new Idempotency();
+
     private final Table table = new Table();
 
     private final Wechat wechat = new Wechat();
@@ -154,8 +156,19 @@ public class AppProperties {
         /** 待支付订单超时分钟数。 */
         private int paymentTimeoutMinutes = 15;
 
-        /** 超时扫描 cron（默认每分钟）。 */
-        private String timeoutScanCron = "0 * * * * ?";
+        /** 超时扫描 cron（默认每 30 秒，对应 T08 验收）。 */
+        private String autoCancelCron = "0/30 * * * * ?";
+
+        /** 单次扫描最多处理的订单数。 */
+        private int autoCancelBatchSize = 100;
+    }
+
+    /** 幂等配置。 */
+    @Data
+    public static class Idempotency {
+
+        /** 幂等记录与 Redis 请求哈希的保留小时数。 */
+        private int ttlHours = 24;
     }
 
     /** 桌台与会话配置。 */

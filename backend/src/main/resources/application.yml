@@ -162,9 +162,13 @@ app:
     callback-allowed-clock-skew-seconds: ${PAYMENT_CALLBACK_CLOCK_SKEW_SECONDS:300}
 
   order:
-    # 待支付订单超时取消：15 分钟，每分钟扫描一次
+    # 待支付订单超时取消：15 分钟，每 30 秒扫描一次（T08 验收要求）
     payment-timeout-minutes: ${ORDER_PAYMENT_TIMEOUT_MINUTES:15}
-    timeout-scan-cron: ${ORDER_TIMEOUT_SCAN_CRON:0 * * * * ?}
+    auto-cancel-cron: ${ORDER_AUTO_CANCEL_CRON:0/30 * * * * ?}
+    auto-cancel-batch-size: ${ORDER_AUTO_CANCEL_BATCH_SIZE:100}
+
+  idempotency:
+    ttl-hours: ${IDEMPOTENCY_TTL_HOURS:24}
 
   table:
     # 桌台二维码 HMAC-SHA256 签名密钥，生产必须通过 TABLE_QR_SECRET 覆盖

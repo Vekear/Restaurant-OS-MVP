@@ -34,6 +34,10 @@ app:
       root: ./target/test-storage/files
   payment:
     mock-charge-amount: 0.01
+    # 测试中回调地址不可达，走 ADR-0004 的降级直连处理（快速失败）
+    mock-callback-base-url: http://127.0.0.1:1
+  idempotency:
+    ttl-hours: 24
   wechat:
     mock: true
   task:

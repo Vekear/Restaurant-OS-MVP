@@ -3,20 +3,23 @@
  * 顾客端布局：吸顶导航 + 内容区 + 页脚
  * 未登录时导航仍可浏览首页/菜单，订单类页面由路由守卫引导登录。
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandMark from '@/components/BrandMark.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import { customerNav } from '@/config/navigation'
 import { useAuthStore } from '@/stores/auth'
+import { useCartStore } from '@/stores/cart'
 import { realtime } from '@/api/ws'
 
 const auth = useAuthStore()
+const cart = useCartStore()
 const route = useRoute()
 const router = useRouter()
 
 const mobileNavOpen = ref(false)
 const navItems = computed(() => customerNav)
+const cartCount = computed(() => cart.totalQuantity || 0)
 
 function isActive(item) {
   if (item.exact) return route.path === item.path
@@ -29,8 +32,22 @@ function go(path) {
 }
 
 onMounted(() => {
-  if (auth.token) realtime.connect({ token: auth.token })
+  if (auth.token) {
+    realtime.connect({ token: auth.token })
+    if (auth.role === 'CUSTOMER') cart.ensureLoaded()
+  }
 })
+
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn && auth.role === 'CUSTOMER') {
+      cart.ensureLoaded()
+    } else if (!loggedIn) {
+      cart.reset()
+    }
+  }
+)
 </script>
 
 <template>
@@ -54,10 +71,12 @@ onMounted(() => {
         </nav>
 
         <div class="site-header__actions">
-          <el-button class="site-header__cart" text @click="go('/cart')">
-            <el-icon><ShoppingCart /></el-icon>
-            <span class="site-header__cart-text">购物车</span>
-          </el-button>
+          <el-badge :value="cartCount" :max="99" :hidden="cartCount === 0" class="site-header__cart-badge">
+            <el-button class="site-header__cart" text @click="go('/cart')">
+              <el-icon><ShoppingCart /></el-icon>
+              <span class="site-header__cart-text">购物车</span>
+            </el-button>
+          </el-badge>
 
           <template v-if="auth.isLoggedIn">
             <UserMenu />
@@ -215,6 +234,17 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-3);
   margin-left: auto;
+}
+
+.site-header__cart-badge {
+  display: inline-flex;
+}
+
+.site-header__cart-badge :deep(.el-badge__content) {
+  top: 6px;
+  right: 12px;
+  border: none;
+  background-color: var(--color-primary);
 }
 
 .site-header__cart {

@@ -15,13 +15,19 @@ import MerchantLayout from '@/layouts/MerchantLayout.vue'
 import { setupRouterGuards } from '@/router/guards'
 
 const Home = () => import('@/views/customer/Home.vue')
+const Menu = () => import('@/views/customer/Menu.vue')
+const DishDetail = () => import('@/views/customer/DishDetail.vue')
+const Cart = () => import('@/views/customer/Cart.vue')
+const Checkout = () => import('@/views/customer/Checkout.vue')
+const Orders = () => import('@/views/customer/Orders.vue')
+const OrderDetail = () => import('@/views/customer/OrderDetail.vue')
+const Addresses = () => import('@/views/customer/Addresses.vue')
 const Login = () => import('@/views/auth/Login.vue')
 const Register = () => import('@/views/auth/Register.vue')
 const Placeholder = () => import('@/views/common/Placeholder.vue')
 const Forbidden = () => import('@/views/common/Forbidden.vue')
 const NotFound = () => import('@/views/common/NotFound.vue')
 
-const T12 = '阶段 5 · T12'
 const T13 = '阶段 5 · T13'
 const T14 = '阶段 5 · T14'
 
@@ -53,113 +59,71 @@ const routes = [
       {
         path: 'menu',
         name: 'customer-menu',
-        component: Placeholder,
+        component: Menu,
         meta: {
           title: '菜单',
-          description: '按分类浏览菜品，选择规格与加料后加入购物车。',
-          phase: T12,
-          public: true,
-          planned: [
-            { title: '菜品分类与搜索', desc: '左侧分类锚点 + 关键词搜索，支持上下架状态过滤' },
-            { title: '规格与加料', desc: '规格单选、加料多选，实时计算单价与总价' },
-            { title: '加入购物车', desc: '购物车抽屉与数量步进器，登录校验后结算' }
-          ]
+          description: '按分类浏览菜品，支持关键词搜索与价格、销量排序。',
+          public: true
         }
       },
       {
         path: 'menu/:dishId',
         name: 'customer-dish-detail',
-        component: Placeholder,
+        component: DishDetail,
         meta: {
           title: '菜品详情',
-          description: '菜品大图、简介、规格选择与用户评价。',
-          phase: T12,
-          public: true,
-          planned: [
-            { title: '菜品信息', desc: '图片、描述、辣度与过敏原提示' },
-            { title: '规格选择', desc: '规格/加料与库存联动，售罄时禁用下单' },
-            { title: '评价片段', desc: '展示最近评价与评分分布' }
-          ]
+          description: '菜品图片、简介、库存与顾客评价。',
+          public: true
         }
       },
       {
         path: 'cart',
         name: 'customer-cart',
-        component: Placeholder,
+        component: Cart,
         meta: {
           title: '购物车',
-          description: '确认菜品、数量与金额，进入结算流程。',
-          phase: T12,
-          roles: ['CUSTOMER'],
-          planned: [
-            { title: '购物车列表', desc: '菜品明细、数量调整与删除' },
-            { title: '金额计算', desc: '商品小计、配送费与优惠券抵扣' },
-            { title: '去结算', desc: '校验地址与配送时段后创建订单' }
-          ]
+          description: '确认菜品与数量后进入结算。',
+          roles: ['CUSTOMER']
         }
       },
       {
         path: 'checkout',
         name: 'customer-checkout',
-        component: Placeholder,
+        component: Checkout,
         meta: {
           title: '确认订单',
-          description: '选择收货地址、配送时段并完成模拟支付（实际扣款 0.01 元）。',
-          phase: T12,
-          roles: ['CUSTOMER'],
-          planned: [
-            { title: '收货地址', desc: '地址选择与新增，校验手机号与门牌号' },
-            { title: '订单备注', desc: '餐具份数、口味备注与期望送达时间' },
-            { title: '模拟支付', desc: '展示真实金额，实际扣款 0.01 元并写入支付流水' }
-          ]
+          description: '选择收货地址、使用优惠券并完成模拟支付（实际扣款 0.01 元）。',
+          roles: ['CUSTOMER']
         }
       },
       {
         path: 'orders',
         name: 'customer-orders',
-        component: Placeholder,
+        component: Orders,
         meta: {
           title: '我的订单',
           description: '按状态查看历史订单与进行中的订单。',
-          phase: T12,
-          roles: ['CUSTOMER'],
-          planned: [
-            { title: '订单列表', desc: '状态标签筛选、分页与空态' },
-            { title: '订单详情', desc: '菜品明细、金额构成与配送进度' },
-            { title: '实时状态', desc: '订阅 /topic/customer/{id}/orders 刷新状态' }
-          ]
+          roles: ['CUSTOMER']
         }
       },
       {
         path: 'orders/:orderId',
         name: 'customer-order-detail',
-        component: Placeholder,
+        component: OrderDetail,
         meta: {
           title: '订单详情',
-          description: '查看订单状态流转、配送信息与售后入口。',
-          phase: T12,
-          roles: ['CUSTOMER'],
-          planned: [
-            { title: '状态时间线', desc: '待接单 → 制作中 → 配送中 → 已完成' },
-            { title: '金额明细', desc: '商品、配送费、优惠与实付金额' },
-            { title: '操作入口', desc: '取消订单、联系商家与再次购买' }
-          ]
+          description: '查看订单状态流转、金额明细与操作入口。',
+          roles: ['CUSTOMER']
         }
       },
       {
         path: 'addresses',
         name: 'customer-addresses',
-        component: Placeholder,
+        component: Addresses,
         meta: {
           title: '收货地址',
           description: '维护常用收货地址并设置默认地址。',
-          phase: T12,
-          roles: ['CUSTOMER'],
-          planned: [
-            { title: '地址列表', desc: '联系人、电话、详细地址与默认标记' },
-            { title: '新增/编辑', desc: '地址表单校验与默认地址切换' },
-            { title: '地址选择', desc: '结算页快捷选择最近使用的地址' }
-          ]
+          roles: ['CUSTOMER']
         }
       }
     ]

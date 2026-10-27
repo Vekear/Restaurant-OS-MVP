@@ -4,14 +4,24 @@
  * 展示产品定位、双场景、三端入口与 ECharts 演示图表；
  * 菜品/订单等业务数据在 T12 接入后端，本页数据均标注「演示数据」。
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { ArrowRight, Bowl, Shop } from '@element-plus/icons-vue'
 import EChartPanel from '@/components/EChartPanel.vue'
+import DishCard from '@/components/customer/DishCard.vue'
+import { getPublicConfig, getDishes } from '@/api/menu'
 import { useAuthStore } from '@/stores/auth'
+import { useCartStore } from '@/stores/cart'
 
 const router = useRouter()
 const auth = useAuthStore()
+const cart = useCartStore()
+
+const recommended = ref([])
+const recommendLoading = ref(false)
+const recommendError = ref('')
+const busyDishId = ref(0)
 
 const metrics = [
   { value: '32', unit: '款', label: '在售菜品 SKU' },
@@ -130,6 +140,74 @@ function goMerchant() {
   if (auth.isMerchant) router.push('/merchant/dashboard')
   else router.push({ name: 'login', query: { redirect: '/merchant/dashboard' } })
 }
+
+async function loadRecommended() {
+  recommendLoading.value = true
+  recommendError.value = ''
+  try {
+    let merchantId
+    try {
+      const config = await getPublicConfig()
+      merchantId = config?.defaultMerchantId || config?.merchantId || undefined
+    } catch {
+      merchantId = undefined
+    }
+    const data = await getDishes({ merchantId, sort: 'sales_desc', page: 1, size: 4 })
+    recommended.value = Array.isArray(data?.list) ? data.list.slice(0, 4) : []
+  } catch (err) {
+    recommendError.value = err?.message || '推荐菜品加载失败'
+    recommended.value = []
+  } finally {
+    recommendLoading.value = false
+  }
+}
+
+function requireLogin() {
+  if (auth.isLoggedIn) return true
+  ElMessage.info('登录后即可加入购物车')
+  router.push({ name: 'login', query: { redirect: '/menu' } })
+  return false
+}
+
+function describeCartError(err) {
+  if (!err) return '操作失败'
+  if (err.code === 40902) return '购物车已达 50 行上限，请先清理后再添加'
+  if (err.code === 40901) return err.message || '菜品库存不足'
+  if (err.code === 40918) return '该菜品已下架'
+  if (err.code === 40908) return '商家休息中，暂不接单'
+  return err.message || '操作失败，请稍后重试'
+}
+
+async function handleAdd(dish) {
+  if (!requireLogin()) return
+  busyDishId.value = dish.id
+  try {
+    await cart.addItem(dish.id, 1)
+    ElMessage.success(`已加入：${dish.name}`)
+  } catch (err) {
+    ElMessage.error(describeCartError(err))
+  } finally {
+    busyDishId.value = 0
+  }
+}
+
+async function handleChange(dish, quantity) {
+  if (!auth.isLoggedIn) return
+  busyDishId.value = dish.id
+  try {
+    if (quantity <= 0) await cart.removeItem(dish.id)
+    else await cart.updateQuantity(dish.id, quantity)
+  } catch (err) {
+    ElMessage.error(describeCartError(err))
+  } finally {
+    busyDishId.value = 0
+  }
+}
+
+onMounted(() => {
+  loadRecommended()
+  if (auth.isLoggedIn && auth.role === 'CUSTOMER') cart.ensureLoaded()
+})
 </script>
 
 <template>
@@ -205,6 +283,68 @@ function goMerchant() {
           </div>
           <div class="hero__blob" />
         </div>
+      </div>
+    </section>
+
+    <!-- ============ 本店热销 ============ -->
+    <section class="app-container section">
+      <header class="section__head section__head--row">
+        <div>
+          <p class="section__eyebrow">Best sellers</p>
+          <h2 class="section__title">本店热销 Top 4</h2>
+          <p class="section__desc">按销量取前 4 道菜，可直接加入购物车；数据来自菜单接口。</p>
+        </div>
+        <router-link to="/menu" class="section__more">
+          查看完整菜单
+          <el-icon><ArrowRight /></el-icon>
+        </router-link>
+      </header>
+
+      <div v-if="recommendLoading" class="recommend-grid">
+        <div v-for="index in 4" :key="index" class="recommend-skeleton">
+          <el-skeleton animated>
+            <template #template>
+              <el-skeleton-item variant="image" class="recommend-skeleton__image" />
+              <div class="recommend-skeleton__body">
+                <el-skeleton-item variant="h3" style="width: 60%" />
+                <el-skeleton-item variant="text" style="width: 90%" />
+                <el-skeleton-item variant="text" style="width: 40%" />
+              </div>
+            </template>
+          </el-skeleton>
+        </div>
+      </div>
+
+      <el-alert
+        v-else-if="recommendError"
+        type="warning"
+        :title="recommendError"
+        :closable="false"
+        show-icon
+      >
+        <template #default>
+          <el-button text type="primary" size="small" @click="loadRecommended">重试</el-button>
+          <span class="text-tertiary">后端未启动时可继续浏览演示内容。</span>
+        </template>
+      </el-alert>
+
+      <div v-else-if="recommended.length" class="recommend-grid">
+        <DishCard
+          v-for="dish in recommended"
+          :key="dish.id"
+          :dish="dish"
+          compact
+          :quantity="cart.quantityOf(dish.id)"
+          :busy="busyDishId === dish.id"
+          @add="handleAdd(dish)"
+          @change="handleChange(dish, $event)"
+        />
+      </div>
+
+      <div v-else class="empty-state">
+        暂无推荐菜品，去
+        <router-link to="/menu">完整菜单</router-link>
+        看看。
       </div>
     </section>
 
@@ -629,6 +769,62 @@ function goMerchant() {
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
   line-height: var(--line-height-loose);
+}
+
+/* ============ 本店热销 ============ */
+.section__head--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: none;
+}
+
+.section__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.recommend-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.recommend-skeleton {
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.recommend-skeleton__image {
+  width: 100%;
+  height: 132px;
+}
+
+.recommend-skeleton__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+@media (max-width: 1000px) {
+  .recommend-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .recommend-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ============ 场景卡片 ============ */

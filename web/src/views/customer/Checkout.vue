@@ -344,8 +344,7 @@ onMounted(bootstrap)
                 />
               </el-select>
               <p v-if="!couponOptions.length" class="checkout-form__hint">
-                暂无可用优惠券，
-                <router-link to="/coupons">去领券中心</router-link>
+                暂无可用优惠券，可直接提交订单。
               </p>
             </el-form-item>
             <el-form-item label="订单备注">

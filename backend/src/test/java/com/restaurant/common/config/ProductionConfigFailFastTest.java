@@ -9,6 +9,8 @@ import org.springframework.mock.env.MockEnvironment;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,11 +27,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class ProductionConfigFailFastTest {
 
-    /** 随机风格强密钥（不含 dev-only / please-change 等占位标记）。 */
-    private static final String STRONG_JWT_SECRET = "b7Fq2mZx9Lk4Wp8Rt3Yv6Nc1Hj5Ds0GaQe7Uo2Pi";
-    private static final String STRONG_PAY_CALLBACK_SECRET = "p9K2sV7nQ4rT8wY3mB6cX1zL5hJ0gF2d";
-    private static final String STRONG_TABLE_QR_SECRET = "q3H8jN5bV2xC7kM9pL4tR1wY6zS0dG3f";
-    private static final String STRONG_DB_PASSWORD = "D9fK2mP7sX4vN8qL3wZ6bT1rY5cH0jG";
+    /**
+     * 运行时生成强密钥，避免把任何真实凭证形态的字符串写进仓库（scripts/check-no-secrets.mjs 门禁）。
+     * 32 字节 SecureRandom → Base64URL 43 字符，满足 JWT 最小 32 字节且不含 dev-only / please-change 等占位标记。
+     */
+    private static final String STRONG_JWT_SECRET = randomSecret();
+    private static final String STRONG_PAY_CALLBACK_SECRET = randomSecret();
+    private static final String STRONG_TABLE_QR_SECRET = randomSecret();
+    private static final String STRONG_DB_PASSWORD = randomSecret();
+
+    private static String randomSecret() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
     private static final String LOCAL_STORAGE_TYPE = "local";
 
     private static MockEnvironment dockerEnvironment() {

@@ -4,6 +4,7 @@ import com.restaurant.common.config.AppProperties;
 import com.restaurant.common.constant.ApiConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -19,8 +20,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  *   <li>允许来源复用 app.cors 配置（浏览器握手校验，非浏览器客户端不受 Origin 限制）。</li>
  * </ul>
  *
- * <p>T08 将补充：握手 query token 鉴权 ChannelInterceptor、订阅 ACL、心跳
- * （{@code setHeartbeatValue(10000,10000)}）与原生 {@code /ws/native} 通道。
+ * <p>安全（T34，修复 {@code docs/05-security.md} H-01）：入站通道注册
+ * {@link WebSocketAuthChannelInterceptor}，CONNECT 校验 JWT，SUBSCRIBE 按目的地做
+ * RBAC/归属校验，未列明目的地一律拒绝；握手来源仍由 {@code setAllowedOriginPatterns} 限制。
  */
 @Configuration
 @EnableWebSocketMessageBroker
@@ -29,10 +31,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final AppProperties appProperties;
 
+    private final WebSocketAuthChannelInterceptor webSocketAuthChannelInterceptor;
+
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint(ApiConstants.WS_ENDPOINT)
                 .setAllowedOriginPatterns(appProperties.getCors().getAllowedOriginPatterns().toArray(String[]::new));
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(webSocketAuthChannelInterceptor);
     }
 
     @Override

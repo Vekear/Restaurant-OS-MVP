@@ -90,6 +90,19 @@ describe('cart store 购物车', () => {
     expect(cart.totalQuantity).toBe(0)
   })
 
+  it('金额与数量以服务端 CartView 为准，不按 items 本地重算', async () => {
+    loginAsCustomer()
+    mocks.getCart.mockResolvedValue(cartView({ totalQuantity: 7, totalAmount: 999 }))
+    setActivePinia(createPinia())
+    const cart = useCartStore()
+
+    await cart.fetchCart({ force: true })
+
+    expect(cart.totalQuantity).toBe(7)
+    expect(cart.totalAmount).toBe(999)
+    expect(cart.estimatedTotal).toBe(999)
+  })
+
   it('未登录时 addItem 抛出 NEED_LOGIN 且不请求接口', async () => {
     const cart = useCartStore()
     await expect(cart.addItem(1, 1)).rejects.toMatchObject({ code: 'NEED_LOGIN' })

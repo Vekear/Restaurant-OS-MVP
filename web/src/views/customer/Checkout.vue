@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import DishThumb from '@/components/DishThumb.vue'
 import AddressFormDialog from '@/components/customer/AddressFormDialog.vue'
+import CouponClaimDialog from '@/components/customer/CouponClaimDialog.vue'
 import PaymentDialog from '@/components/customer/PaymentDialog.vue'
 import { getMerchant, getPublicConfig } from '@/api/menu'
 import { listAddresses } from '@/api/addresses'
@@ -37,6 +38,7 @@ const remark = ref('')
 const submitting = ref(false)
 const addressDialogVisible = ref(false)
 const editingAddress = ref(null)
+const couponDialogVisible = ref(false)
 const paymentVisible = ref(false)
 const createdOrder = ref(null)
 
@@ -136,6 +138,11 @@ function retryAll() {
 
 function onCouponChange() {
   loadQuote()
+}
+
+/** 领券成功后重新试算，新券会出现在可选列表中 */
+async function onCouponClaimed() {
+  await loadQuote()
 }
 
 function openAddressDialog(address = null) {
@@ -326,25 +333,31 @@ onMounted(bootstrap)
           </header>
           <el-form label-width="88px" class="checkout-form">
             <el-form-item label="优惠券">
-              <el-select
-                v-model="selectedCouponId"
-                placeholder="不使用优惠券"
-                clearable
-                :loading="quoteLoading"
-                class="checkout-form__control"
-                @change="onCouponChange"
-              >
-                <el-option :value="0" label="不使用优惠券" />
-                <el-option
-                  v-for="coupon in couponOptions"
-                  :key="coupon.id"
-                  :value="coupon.id"
-                  :label="`${coupon.name || '满减券'} · 满 ¥${formatAmount(coupon.thresholdAmount)} 减 ¥${formatAmount(coupon.discountAmount)}`"
-                  :disabled="coupon.usable === false"
-                />
-              </el-select>
+              <div class="checkout-form__coupon">
+                <el-select
+                  v-model="selectedCouponId"
+                  placeholder="不使用优惠券"
+                  clearable
+                  :loading="quoteLoading"
+                  class="checkout-form__control"
+                  @change="onCouponChange"
+                >
+                  <el-option :value="0" label="不使用优惠券" />
+                  <el-option
+                    v-for="coupon in couponOptions"
+                    :key="coupon.id"
+                    :value="coupon.id"
+                    :label="`${coupon.name || '满减券'} · 满 ¥${formatAmount(coupon.thresholdAmount)} 减 ¥${formatAmount(coupon.discountAmount)}`"
+                    :disabled="coupon.usable === false"
+                  />
+                </el-select>
+                <el-button plain type="primary" @click="couponDialogVisible = true">
+                  <el-icon><Discount /></el-icon>
+                  领券中心
+                </el-button>
+              </div>
               <p v-if="!couponOptions.length" class="checkout-form__hint">
-                暂无可用优惠券，可直接提交订单。
+                暂无可用优惠券，可去领券中心看看，或直接提交订单。
               </p>
             </el-form-item>
             <el-form-item label="订单备注">
@@ -413,6 +426,11 @@ onMounted(bootstrap)
       v-model="addressDialogVisible"
       :address="editingAddress"
       @saved="onAddressSaved"
+    />
+    <CouponClaimDialog
+      v-model="couponDialogVisible"
+      :amount="Number(quote?.totalAmount ?? cart.totalAmount ?? 0)"
+      @claimed="onCouponClaimed"
     />
     <PaymentDialog
       :model-value="paymentVisible"
@@ -578,6 +596,13 @@ onMounted(bootstrap)
 }
 
 .checkout-form__control {
+  width: 100%;
+}
+
+.checkout-form__coupon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   width: 100%;
 }
 

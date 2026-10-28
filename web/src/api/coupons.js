@@ -5,7 +5,7 @@
 import { http } from './http'
 
 /**
- * GET /coupons —— 可领取券模板分页（公开可领，登录后计算 claimed）
+ * GET /coupons —— 可领取券模板分页（需登录：claimed/claimable/usable 按当前用户计算）
  * @param {{ amount?: number, page?: number, size?: number }} params
  */
 export function listCoupons(params = {}) {

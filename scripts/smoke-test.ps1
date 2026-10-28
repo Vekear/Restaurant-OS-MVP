@@ -20,8 +20,8 @@
     $env:TABLE_QR_SECRET       可选；设置时用于重算桌台二维码签名并与服务端结果比对
   脚本内不写任何真实凭证；local 存储模式为默认断言。
 
-  后端 T08–T10 未完成前，本脚本只能做 AST 语法自检并明确输出「未验证」，
-  不应伪造运行通过。示例：
+  本脚本不做任何降级或伪造：后端未启动、契约端点未实现或密钥缺失时，
+  对应断言会失败或 SKIP，并在输出中明确标注「未验证」。示例：
     $env:PAY_CALLBACK_SECRET='<与后端一致的开发密钥>'
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.ps1
 
@@ -43,6 +43,9 @@
 .PARAMETER SkipStatic
   网关检查中跳过静态首页检查。
 
+.PARAMETER SkipGateway
+  显式跳过可选网关检查（未提供 -GatewayUrl 时本来也会跳过）。
+
 .EXAMPLE
   $env:PAY_CALLBACK_SECRET='dev-secret'
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.ps1
@@ -59,6 +62,7 @@ param(
     [switch]$SkipSlow,
     [switch]$IncludeSlow,
     [switch]$SkipStatic,
+    [switch]$SkipGateway,
     [switch]$SkipTakeout,
     [switch]$SkipExports
 )
@@ -128,11 +132,57 @@ function Assert-Step {
     }
 }
 
+function ConvertTo-HeaderTable {
+    param($Headers)
+    $table = @{}
+    if ($null -eq $Headers) { return $table }
+    # PS 5.1 的 Invoke-WebRequest 响应头是 Dictionary（只有 .Keys）；
+    # HttpWebResponse.Headers 是 WebHeaderCollection（只有 .AllKeys）。两者都要兼容。
+    $keys = @()
+    try {
+        if ($null -ne $Headers.AllKeys) { $keys = @($Headers.AllKeys) }
+    } catch { }
+    if ($keys.Count -eq 0) {
+        try {
+            if ($null -ne $Headers.Keys) { $keys = @($Headers.Keys) }
+        } catch { }
+    }
+    foreach ($key in $keys) {
+        if ($null -eq $key) { continue }
+        try { $table[[string]$key] = [string]$Headers[$key] } catch { }
+    }
+    return $table
+}
+
+function Get-ErrorBodyText {
+    param($ErrorRecord, $Response)
+    $text = ''
+    # PS 5.1 中 Invoke-WebRequest 的异常响应流经常为空，真实错误体在 ErrorDetails.Message。
+    try {
+        if ($null -ne $ErrorRecord -and $null -ne $ErrorRecord.ErrorDetails -and
+            -not [string]::IsNullOrEmpty([string]$ErrorRecord.ErrorDetails.Message)) {
+            $text = [string]$ErrorRecord.ErrorDetails.Message
+        }
+    } catch { }
+    if ([string]::IsNullOrEmpty($text) -and $null -ne $Response) {
+        try {
+            $stream = $Response.GetResponseStream()
+            if ($null -ne $stream) {
+                $reader = New-Object System.IO.StreamReader($stream)
+                $text = $reader.ReadToEnd()
+                $reader.Dispose()
+            }
+        } catch { }
+    }
+    return $text
+}
+
 function Get-Header {
     param($Response, [string]$Name)
     if ($null -eq $Response -or $null -eq $Response.Headers) { return $null }
-    foreach ($key in @($Response.Headers.Keys)) {
-        if ([string]$key -ieq $Name) { return [string]$Response.Headers[$key] }
+    $table = ConvertTo-HeaderTable -Headers $Response.Headers
+    foreach ($key in $table.Keys) {
+        if ([string]$key -ieq $Name) { return [string]$table[$key] }
     }
     return $null
 }
@@ -227,32 +277,18 @@ function Invoke-Http {
                 $webResp = $webReq.GetResponse()
                 $result.Status = [int]$webResp.StatusCode
                 $result.Ok = ($result.Status -ge 200 -and $result.Status -lt 300)
-                try {
-                    foreach ($key in @($webResp.Headers.AllKeys)) {
-                        $result.Headers[$key] = [string]$webResp.Headers[$key]
-                    }
-                } catch { }
+                $result.Headers = ConvertTo-HeaderTable -Headers $webResp.Headers
                 $dest = [System.IO.File]::Create($OutFile)
                 try { $webResp.GetResponseStream().CopyTo($dest) } finally { $dest.Dispose() }
             } catch {
+                $wexRecord = $_
                 $wex = $_.Exception
                 $result.Error = $wex.Message
                 $webResp = $wex.Response
                 if ($null -ne $webResp) {
                     try { $result.Status = [int]$webResp.StatusCode } catch { }
-                    try {
-                        $stream = $webResp.GetResponseStream()
-                        if ($null -ne $stream) {
-                            $reader = New-Object System.IO.StreamReader($stream)
-                            $result.Raw = $reader.ReadToEnd()
-                            $reader.Dispose()
-                        }
-                    } catch { }
-                    try {
-                        foreach ($key in @($webResp.Headers.AllKeys)) {
-                            $result.Headers[$key] = [string]$webResp.Headers[$key]
-                        }
-                    } catch { }
+                    $result.Raw = Get-ErrorBodyText -ErrorRecord $wexRecord -Response $webResp
+                    $result.Headers = ConvertTo-HeaderTable -Headers $webResp.Headers
                     $result.Ok = ($result.Status -ge 200 -and $result.Status -lt 300)
                 }
             } finally {
@@ -272,33 +308,19 @@ function Invoke-Http {
                 $result.Raw = [string]$response.Content
             }
         }
-        try {
-            foreach ($key in @($response.Headers.AllKeys)) {
-                $result.Headers[$key] = [string]$response.Headers[$key]
-            }
-        } catch { }
+        $result.Headers = ConvertTo-HeaderTable -Headers $response.Headers
         Write-Verbose ("HTTP {0} {1} -> {2} ({3} ms)" -f $Method, $Uri, $result.Status, $sw.ElapsedMilliseconds)
         }
     } catch {
+        $errRecord = $_
         $ex = $_.Exception
         $result.Error = $ex.Message
         $response = $null
         try { $response = $ex.Response } catch { }
         if ($null -ne $response) {
             try { $result.Status = [int]$response.StatusCode } catch { }
-            try {
-                $stream = $response.GetResponseStream()
-                if ($null -ne $stream) {
-                    $reader = New-Object System.IO.StreamReader($stream)
-                    $result.Raw = $reader.ReadToEnd()
-                    $reader.Dispose()
-                }
-            } catch { }
-            try {
-                foreach ($key in @($response.Headers.AllKeys)) {
-                    $result.Headers[$key] = [string]$response.Headers[$key]
-                }
-            } catch { }
+            $result.Raw = Get-ErrorBodyText -ErrorRecord $errRecord -Response $response
+            $result.Headers = ConvertTo-HeaderTable -Headers $response.Headers
             $result.Ok = ($result.Status -ge 200 -and $result.Status -lt 300)
             Write-Verbose ("HTTP {0} {1} -> {2} ({3} ms)" -f $Method, $Uri, $result.Status, $sw.ElapsedMilliseconds)
         } else {
@@ -487,7 +509,7 @@ try {
 
     Write-Host '餐厅点餐系统 MVP 冒烟测试（完整 happy-path）'
     Write-Host ("后端: " + $BaseUrl + "  网关: " + $(if ($GatewayUrl) { $GatewayUrl } else { '（未提供，跳过）' }))
-    Write-Host '注意: 后端 T08–T10 未完成时，本脚本不具备运行条件；仅完成 AST 语法自检时须标注「未验证」。' -ForegroundColor Yellow
+    Write-Host '注意: 后端未启动或契约端点未实现时，对应断言会失败或 SKIP，不得据此宣称冒烟通过。' -ForegroundColor Yellow
     Write-Host ("开始时间: " + $startedAt.ToString('yyyy-MM-dd HH:mm:ss'))
 
     $script:PaySecret = [string]$env:PAY_CALLBACK_SECRET
@@ -540,14 +562,14 @@ try {
 
     $script:PaySecret = [string]$env:PAY_CALLBACK_SECRET
     if (-not $script:PaySecret) {
-        Add-Check -Name 'A12 前置密钥 PAY_CALLBACK_SECRET' -Passed $false -Detail '未设置环境变量 PAY_CALLBACK_SECRET，无法验签 mock 回调（同时 T08–T10 未完成时标记「未验证」）'
+        Add-Check -Name 'A12 前置密钥 PAY_CALLBACK_SECRET' -Passed $false -Detail '未设置环境变量 PAY_CALLBACK_SECRET，无法验签 mock 回调'
         throw [System.Exception]::new('缺少 PAY_CALLBACK_SECRET')
     }
     Add-Check -Name 'A12 前置密钥 PAY_CALLBACK_SECRET' -Passed $true -Detail ('长度 ' + $script:PaySecret.Length + '（脚本未打印密钥内容）')
 
     Write-Stage 'B 外卖全链路'
     if ($SkipTakeout) {
-        Add-Skip -Name 'B 外卖全链路' -Reason '指定了 -SkipTakeout（当前后端未实现 /addresses、/cart、/coupons/quote 等契约端点）'
+        Add-Skip -Name 'B 外卖全链路' -Reason '显式指定 -SkipTakeout，跳过外卖链路'
     } else {
     $addr = Invoke-Http -Method GET -Uri ($ApiBase + '/addresses') -Headers @{ Authorization = 'Bearer ' + $customerToken }
     $addrOk = (Test-ApiResponse $addr) -and (@($addr.Body.data).Count -gt 0)
@@ -724,7 +746,7 @@ try {
     if ((Test-ApiResponse $bind) -and [string]$bind.Body.data.sessionToken) { $tableSession = [string]$bind.Body.data.sessionToken }
     $tableHeaders = @{ Authorization = 'Bearer ' + $customerToken; 'X-Table-Session' = $tableSession }
 
-    Add-Skip -Name 'C10 堂食会话加购' -Reason '契约 11.1 堂食下单直接提交 items，不依赖 /cart；当前 18080 未实现 /cart，故不阻断 C11'
+    Add-Skip -Name 'C10 堂食会话加购' -Reason '契约 11.1 堂食下单直接提交 items，不依赖 /cart'
 
     $dineIdem = [guid]::NewGuid().ToString()
     $dineOrderBody = [ordered]@{ items = @([ordered]@{ dishId = 1; quantity = 1 }); remark = '冒烟测试-堂食' }
@@ -828,7 +850,7 @@ try {
 
     Write-Stage 'E 报表导出 xlsx'
     if ($SkipExports) {
-        Add-Skip -Name 'E 报表导出 xlsx' -Reason '指定了 -SkipExports（当前后端未实现 /merchant/export/orders、/admin/orders/export）'
+        Add-Skip -Name 'E 报表导出 xlsx' -Reason '显式指定 -SkipExports，跳过报表导出'
     } else {
     $today = Get-Date
     $fromDate = $today.AddDays(-7).ToString('yyyy-MM-dd')
@@ -870,8 +892,8 @@ try {
     }
 
     Write-Stage 'G 网关（可选 -GatewayUrl）'
-    if (-not $GatewayUrl) {
-        Add-Skip -Name 'G1-G5 网关链路' -Reason '未提供 -GatewayUrl，跳过'
+    if (-not $GatewayUrl -or $SkipGateway) {
+        Add-Skip -Name 'G1-G5 网关链路' -Reason $(if ($SkipGateway) { '指定了 -SkipGateway，跳过' } else { '未提供 -GatewayUrl，跳过' })
     } else {
         $gw = $GatewayUrl.TrimEnd('/')
         $gwHealth = Invoke-Http -Method GET -Uri ($gw + '/healthz')
@@ -931,7 +953,7 @@ try {
         Write-Host '结果: PASS（全部通过）。' -ForegroundColor Green
         $exitCode = 0
     }
-    Write-Host '若后端 T08–T10 尚未完成，本次仅能视为「未验证」，不得据此宣称冒烟通过。' -ForegroundColor Yellow
+    Write-Host '未执行/跳过的项目视为「未验证」，不得据此宣称冒烟通过。' -ForegroundColor Yellow
 }
 
 exit $exitCode

@@ -5,6 +5,7 @@ import com.restaurant.common.api.ErrorCode;
 import com.restaurant.common.enums.OrderStatus;
 import com.restaurant.common.exception.BizException;
 import com.restaurant.contract.OrderLookupPort;
+import com.restaurant.contract.UserLookupPort;
 import com.restaurant.review.dto.ReviewCreateRequest;
 import com.restaurant.review.mapper.EvaluationMapper;
 import com.restaurant.review.vo.ReviewView;
@@ -23,6 +24,8 @@ public class ReviewService {
     private final EvaluationMapper evaluationMapper;
 
     private final OrderLookupPort orderLookupPort;
+
+    private final UserLookupPort userLookupPort;
 
     @Transactional(rollbackFor = Exception.class)
     public ReviewView create(Long userId, Long orderId, ReviewCreateRequest request) {
@@ -83,6 +86,7 @@ public class ReviewService {
 
     private ReviewView toView(Evaluation evaluation, OrderLookupPort.OrderBrief order) {
         return new ReviewView(evaluation.getId(), evaluation.getOrderId(), order.orderType(), order.orderNo(),
+                evaluation.getUserId(), userLookupPort.nickname(evaluation.getUserId()),
                 evaluation.getRating(), evaluation.getContent(), evaluation.getImageUrls(),
                 orderLookupPort.dishNames(order.id()), evaluation.getReply(), evaluation.getCreatedAt());
     }

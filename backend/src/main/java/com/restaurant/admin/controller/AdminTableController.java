@@ -35,8 +35,8 @@ public class AdminTableController {
     private final TableService tableService;
 
     @GetMapping
-    @Operation(summary = "按商家查询桌台")
-    public Result<List<TableView>> list(@RequestParam Long merchantId) {
+    @Operation(summary = "查询桌台（merchantId 可选，缺省返回全部）")
+    public Result<List<TableView>> list(@RequestParam(required = false) Long merchantId) {
         return Result.success(tableService.listByMerchant(merchantId));
     }
 

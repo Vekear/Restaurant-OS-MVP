@@ -65,13 +65,11 @@ public class TableService {
         return listByMerchant(roleGuard.requireMerchantId());
     }
 
-    /** 管理员按商家查询桌台列表。 */
+    /** 管理员按商家查询桌台列表；merchantId 为空时返回全部（最多 200 条）。 */
     public List<TableView> listByMerchant(Long merchantId) {
-        if (merchantId == null) {
-            throw new BizException(ErrorCode.PARAM_INVALID, "merchantId 不能为空");
-        }
         List<TableInfo> tables = tableInfoMapper.selectList(Wrappers.<TableInfo>lambdaQuery()
-                .eq(TableInfo::getMerchantId, merchantId)
+                .eq(merchantId != null, TableInfo::getMerchantId, merchantId)
+                .orderByAsc(TableInfo::getMerchantId)
                 .orderByAsc(TableInfo::getTableNo)
                 .last("LIMIT 200"));
         return tables.stream().map(this::toView).toList();

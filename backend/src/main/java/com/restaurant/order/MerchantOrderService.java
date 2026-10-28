@@ -9,6 +9,7 @@ import com.restaurant.common.api.PageResult;
 import com.restaurant.common.enums.OrderStatus;
 import com.restaurant.common.enums.OrderType;
 import com.restaurant.common.exception.BizException;
+import com.restaurant.contract.TableReleasePort;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.statemachine.OrderOperator;
 import com.restaurant.order.statemachine.OrderStateMachine;
@@ -33,6 +34,8 @@ public class MerchantOrderService {
     private final OrderSideEffectService orderSideEffectService;
 
     private final OrderViewAssembler orderViewAssembler;
+
+    private final TableReleasePort tableReleasePort;
 
     @Transactional(readOnly = true)
     public PageResult<OrderView> list(Long merchantId, String statusGroup, String status, int page, int size) {
@@ -77,7 +80,12 @@ public class MerchantOrderService {
         return orderViewAssembler.toDetail(updated);
     }
 
-    /** PAID → REJECTED，回补库存/优惠券并模拟退款。 */
+    /**
+     * PAID → REJECTED，回补库存/优惠券并模拟退款。
+     *
+     * <p>堂食订单与完成订单同语义：在同一事务内关闭桌台会话并释放桌台
+     * （发布 {@code TableSessionClosedEvent}），避免拒单后桌台被占用至会话超时。
+     */
     @Transactional(rollbackFor = Exception.class)
     public OrderDetailView reject(Long merchantId, Long orderId, String reason) {
         if (!StringUtils.hasText(reason) || reason.trim().length() < 2 || reason.length() > 100) {
@@ -89,6 +97,10 @@ public class MerchantOrderService {
         orderSideEffectService.restoreStock(order);
         orderSideEffectService.restoreCoupon(order);
         orderSideEffectService.refundPaid(orderId);
+        if (OrderType.DINE_IN.name().equals(order.getOrderType())
+                && order.getTableId() != null && order.getTableSessionId() != null) {
+            tableReleasePort.release(order.getTableId(), order.getTableSessionId());
+        }
         return orderViewAssembler.toDetail(updated);
     }
 

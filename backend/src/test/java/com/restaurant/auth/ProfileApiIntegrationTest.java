@@ -51,7 +51,7 @@ class ProfileApiIntegrationTest {
 
     @Test
     void updateProfileThenReadBackAndClearPhone() throws Exception {
-        String token = login("customer", "customer123");
+        String token = register("资料顾客");
         String nickname = "资料顾客" + suffix();
         String phone = "139" + randomDigits(8);
         String avatarUrl = "/files/avatar/" + suffix() + ".png";
@@ -83,7 +83,7 @@ class ProfileApiIntegrationTest {
 
     @Test
     void profileValidationRejectsBadInputsAndRequiresLogin() throws Exception {
-        String token = login("customer", "customer123");
+        String token = register("资料顾客校验");
 
         ResponseEntity<String> badPhone = putJson("/api/v1/auth/profile", Map.of("phone", "12345"), token);
         assertThat(badPhone.getStatusCode().value()).isEqualTo(400);
@@ -111,6 +111,16 @@ class ProfileApiIntegrationTest {
         assertThat(merchantUpdated.getStatusCode().value()).isEqualTo(200);
         assertThat((String) JsonPath.read(merchantUpdated.getBody(), "$.data.nickname"))
                 .isEqualTo(merchantNickname);
+    }
+
+    /**
+     * 自注册独立顾客，避免修改共享种子数据（H-2：测试可重复，不依赖/污染种子用户）。
+     */
+    private String register(String nickname) throws Exception {
+        ResponseEntity<String> response = postJson("/api/v1/auth/register",
+                Map.of("username", "u" + suffix(), "password", "pass1234", "nickname", nickname), null);
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        return JsonPath.read(response.getBody(), "$.data.token");
     }
 
     private String login(String username, String password) throws Exception {

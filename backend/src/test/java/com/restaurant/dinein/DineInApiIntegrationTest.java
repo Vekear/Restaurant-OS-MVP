@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.restaurant.common.enums.OrderStatus;
+import com.restaurant.contract.event.TableSessionClosedEvent;
 import com.restaurant.table.TableInfo;
 import com.restaurant.table.TableSession;
 import com.restaurant.table.mapper.TableInfoMapper;
@@ -13,7 +14,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -35,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -51,6 +57,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(DineInApiIntegrationTest.EventConfig.class)
 class DineInApiIntegrationTest {
 
     private static final String TABLES = "/api/v1/merchant/tables";
@@ -75,8 +82,12 @@ class DineInApiIntegrationTest {
     @Autowired
     private TableSessionCleanupService tableSessionCleanupService;
 
+    @Autowired
+    private SessionEvents sessionEvents;
+
     @BeforeEach
     void clearRateLimitKeys() {
+        sessionEvents.clear();
         Set<String> keys = stringRedisTemplate.keys("rate:*");
         if (keys != null && !keys.isEmpty()) {
             stringRedisTemplate.delete(keys);
@@ -278,6 +289,61 @@ class DineInApiIntegrationTest {
                 new HttpEntity<>(new HttpHeaders()), String.class).getStatusCode().value()).isEqualTo(200);
     }
 
+    /**
+     * H-1：堂食订单被商家拒单时，与完成订单同语义释放桌台（会话 CLOSED、桌台 FREE、
+     * 发布 TABLE_SESSION_CLOSED），并保持拒单的退款/库存回补语义。
+     */
+    @Test
+    void merchantRejectDineInOrderReleasesTableAndRefunds() throws Exception {
+        String merchantToken = login("merchant", "merchant123");
+        CreatedTable table = createTable(merchantToken);
+        String customerToken = login("customer", "customer123");
+        String sessionToken = scan(table, customerToken);
+        long dishId = createDish(merchantToken, "堂食拒单菜" + suffix(), "20.00", 6);
+
+        ResponseEntity<String> order = postJson(DINE_IN + "/orders",
+                dineInOrderBody(dishId, 2, "拒单测试"), customerToken,
+                "dinein-reject-" + suffix(), Map.of("X-Table-Session", sessionToken));
+        assertThat(codeOf(order)).isZero();
+        long orderId = ((Number) JsonPath.read(order.getBody(), "$.data.id")).longValue();
+
+        ResponseEntity<String> payment = postJson("/api/v1/payments",
+                Map.of("orderId", orderId, "orderType", "DINE_IN"), customerToken, "pay-" + suffix(), Map.of());
+        assertThat(codeOf(payment)).isZero();
+        String payNo = JsonPath.read(payment.getBody(), "$.data.payNo");
+        ResponseEntity<String> paid = postJson("/api/v1/payments/" + payNo + "/mock-pay", null,
+                customerToken, "mock-pay-" + suffix(), Map.of());
+        assertThat(codeOf(paid)).isZero();
+        assertThat((String) JsonPath.read(paid.getBody(), "$.data.status")).isEqualTo("SUCCESS");
+
+        ResponseEntity<String> rejected = postJson("/api/v1/merchant/orders/" + orderId + "/reject",
+                Map.of("reason", "食材售罄"), merchantToken, null, Map.of());
+        assertThat(rejected.getStatusCode().value()).isEqualTo(200);
+        assertThat(codeOf(rejected)).isZero();
+        assertThat((String) JsonPath.read(rejected.getBody(), "$.data.status")).isEqualTo("REJECTED");
+
+        TableInfo released = tableInfoMapper.selectById(table.id());
+        assertThat(released.getStatus()).isEqualTo("FREE");
+        assertThat(released.getCurrentSessionId()).isNull();
+        TableSession session = tableSessionMapper.selectOne(Wrappers.<TableSession>lambdaQuery()
+                .eq(TableSession::getSessionToken, sessionToken));
+        assertThat(session.getStatus()).isEqualTo("CLOSED");
+        assertThat(session.getClosedAt()).isNotNull();
+        assertThat(sessionEvents.closed()).anyMatch(event ->
+                Long.valueOf(table.id()).equals(event.tableId())
+                        && session.getId().equals(event.sessionId()));
+
+        ResponseEntity<String> oldSession = get(DINE_IN + "/session", customerToken, sessionToken);
+        assertThat(oldSession.getStatusCode().value()).isEqualTo(409);
+        assertThat(codeOf(oldSession)).isEqualTo(40911);
+
+        ResponseEntity<String> paymentDetail = get("/api/v1/payments/" + payNo, customerToken, null);
+        assertThat((String) JsonPath.read(paymentDetail.getBody(), "$.data.status")).isEqualTo("REFUNDED");
+
+        ResponseEntity<String> dish = get("/api/v1/menu/dishes/" + dishId, null, null);
+        assertThat(((Number) JsonPath.read(dish.getBody(), "$.data.stock")).intValue()).isEqualTo(6);
+    }
+
     @Test
     void cleanupExpiresIdleSessionAndReleasesTable() throws Exception {
         String merchantToken = login("merchant", "merchant123");
@@ -298,8 +364,34 @@ class DineInApiIntegrationTest {
         assertThat(tableSessionCleanupService.cleanupExpiredSessions()).isZero();
     }
 
-    private CreatedTable createTable(String merchantToken) throws Exception {
-        String tableNo = "A" + suffix();
+    @TestConfiguration
+    static class EventConfig {
+
+        @Bean
+        SessionEvents sessionEvents() {
+            return new SessionEvents();
+        }
+    }
+
+    static class SessionEvents {
+
+        private final List<TableSessionClosedEvent> closed = new CopyOnWriteArrayList<>();
+
+        @EventListener
+        public void onClosed(TableSessionClosedEvent event) {
+            closed.add(event);
+        }
+
+        List<TableSessionClosedEvent> closed() {
+            return closed;
+        }
+
+        void clear() {
+            closed.clear();
+        }
+    }
+
+    private CreatedTable createTable(String merchantToken) throws Exception {        String tableNo = "A" + suffix();
         ResponseEntity<String> response = postJson(TABLES, Map.of("tableNo", tableNo, "name", "测试桌", "capacity", 4),
                 merchantToken, null, Map.of());
         assertThat(response.getStatusCode().value()).isEqualTo(200);

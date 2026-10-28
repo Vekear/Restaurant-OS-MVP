@@ -159,11 +159,6 @@ public class PaymentService implements PaymentQueryPort, PaymentRefundPort {
         if (!StringUtils.hasText(signature) || !constantTimeEquals(expected, signature)) {
             throw new BizException(ErrorCode.PARAM_INVALID, "回调签名校验失败");
         }
-        Boolean fresh = stringRedisTemplate.opsForValue()
-                .setIfAbsent(NONCE_PREFIX + nonce, "1", NONCE_TTL);
-        if (Boolean.FALSE.equals(fresh)) {
-            throw new BizException(ErrorCode.PARAM_INVALID, "回调 nonce 已使用");
-        }
 
         PaymentCallbackRequest request = parseBody(rawBody);
         if (!StringUtils.hasText(request.payNo())) {
@@ -182,6 +177,14 @@ public class PaymentService implements PaymentQueryPort, PaymentRefundPort {
         if (request.paidAmount() == null
                 || request.paidAmount().setScale(2, RoundingMode.HALF_UP).compareTo(expectedPaid) != 0) {
             throw new BizException(ErrorCode.AMOUNT_MISMATCH, "回调金额与订单不符");
+        }
+
+        // nonce 在签名/时间窗/报文/金额等全部校验通过后才原子占用；
+        // 校验失败的重试不会永久消耗 nonce（M-2）。
+        Boolean fresh = stringRedisTemplate.opsForValue()
+                .setIfAbsent(NONCE_PREFIX + nonce, "1", NONCE_TTL);
+        if (Boolean.FALSE.equals(fresh)) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "回调 nonce 已使用");
         }
 
         if (PaymentStatus.SUCCESS.name().equals(payment.getStatus())) {
@@ -232,19 +235,27 @@ public class PaymentService implements PaymentQueryPort, PaymentRefundPort {
         paymentMapper.closePendingByOrder(orderId);
     }
 
+    /**
+     * 首次成功才发布事件：条件 UPDATE 仅 PENDING → SUCCESS 生效（M-1）。
+     *
+     * <p>并发回调中只有赢得更新的线程发布 {@link PaymentSucceededEvent}；其余线程
+     * 更新 0 行后重读，若已是 SUCCESS 则静默返回，避免订单被重复推进。
+     */
     private void markSuccess(Payment payment, String transactionNo, LocalDateTime paidAt) {
-        payment.setStatus(PaymentStatus.SUCCESS.name());
-        payment.setTransactionNo(transactionNo);
-        payment.setPaidAt(paidAt == null ? LocalDateTime.now() : paidAt);
-        payment.setCallbackAt(LocalDateTime.now());
-        int rows = paymentMapper.updateById(payment);
+        LocalDateTime successPaidAt = paidAt == null ? LocalDateTime.now() : paidAt;
+        LocalDateTime callbackAt = LocalDateTime.now();
+        int rows = paymentMapper.markSuccessIfPending(payment.getId(), transactionNo, successPaidAt);
         if (rows == 0) {
-            Payment latest = paymentMapper.selectById(payment.getId());
-            if (latest != null && PaymentStatus.SUCCESS.name().equals(latest.getStatus())) {
+            String latestStatus = paymentMapper.selectStatusForUpdate(payment.getId());
+            if (PaymentStatus.SUCCESS.name().equals(latestStatus)) {
                 return;
             }
             throw new BizException(ErrorCode.ORDER_STATUS_INVALID, "支付单状态已变更，请重试");
         }
+        payment.setStatus(PaymentStatus.SUCCESS.name());
+        payment.setTransactionNo(transactionNo);
+        payment.setPaidAt(successPaidAt);
+        payment.setCallbackAt(callbackAt);
         eventPublisher.publishEvent(new PaymentSucceededEvent(payment.getId(), payment.getPayNo(),
                 payment.getOrderId(), null, payment.getPaidAmount(), payment.getPaidAt(),
                 payment.getTransactionNo()));

@@ -3,11 +3,16 @@ package com.restaurant.payment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.restaurant.common.config.AppProperties;
+import com.restaurant.contract.event.PaymentSucceededEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -25,6 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(PaymentApiIntegrationTest.EventConfig.class)
 class PaymentApiIntegrationTest {
 
     private static final String PAYMENTS = "/api/v1/payments";
@@ -56,8 +69,12 @@ class PaymentApiIntegrationTest {
     @Autowired
     private AppProperties appProperties;
 
+    @Autowired
+    private PaymentEventCounter paymentEventCounter;
+
     @BeforeEach
     void clearRateLimitKeys() {
+        paymentEventCounter.reset();
         Set<String> keys = stringRedisTemplate.keys("rate:*");
         if (keys != null && !keys.isEmpty()) {
             stringRedisTemplate.delete(keys);
@@ -203,6 +220,77 @@ class PaymentApiIntegrationTest {
         assertThat((String) JsonPath.read(payment.getBody(), "$.data.status")).isEqualTo("REFUNDED");
     }
 
+    /** M-2：金额校验失败不消耗 nonce，修正报文后可用同一 nonce 重试成功。 */
+    @Test
+    void failedCallbackValidationDoesNotConsumeNonce() throws Exception {
+        String customerToken = login("customer", "customer123");
+        long dishId = createDish("nonce重试菜" + suffix(), "28.00", 10);
+        long orderId = createOrder(customerToken, dishId, 1);
+        String payNo = createPayment(customerToken, orderId);
+
+        long ts = System.currentTimeMillis();
+        String nonce = nonce();
+        String wrongBody = callbackBody(payNo, "TXBAD" + suffix(), "1.00", "SUCCESS");
+        String wrongSignature = MockPayGatewayClient.hmacSha256Hex(
+                appProperties.getPayment().getCallbackSecret(), ts + "\n" + nonce + "\n" + wrongBody);
+        ResponseEntity<String> rejected = callback(wrongBody, ts, nonce, wrongSignature);
+        assertThat(rejected.getStatusCode().value()).isEqualTo(400);
+        assertThat(codeOf(rejected)).isEqualTo(40005);
+
+        String goodBody = callbackBody(payNo, "TXGOOD" + suffix(), "0.01", "SUCCESS");
+        String goodSignature = MockPayGatewayClient.hmacSha256Hex(
+                appProperties.getPayment().getCallbackSecret(), ts + "\n" + nonce + "\n" + goodBody);
+        ResponseEntity<String> ok = callback(goodBody, ts, nonce, goodSignature);
+        assertThat(ok.getStatusCode().value()).isEqualTo(200);
+        assertThat((String) JsonPath.read(ok.getBody(), "$.data.status")).isEqualTo("SUCCESS");
+        assertThat((String) JsonPath.read(get("/api/v1/orders/" + orderId, customerToken).getBody(),
+                "$.data.status")).isEqualTo("PAID");
+    }
+
+    /** M-1：并发双回调只有一个能把支付单从 PENDING 推进到 SUCCESS，只发一次 PaymentSucceededEvent。 */
+    @Test
+    void concurrentCallbacksPublishPaymentSucceededOnlyOnce() throws Exception {
+        String customerToken = login("customer", "customer123");
+        long dishId = createDish("并发回调菜" + suffix(), "33.00", 10);
+        long orderId = createOrder(customerToken, dishId, 1);
+        String payNo = createPayment(customerToken, orderId);
+        paymentEventCounter.reset();
+
+        long ts = System.currentTimeMillis();
+        String bodyA = callbackBody(payNo, "TXA" + suffix(), "0.01", "SUCCESS");
+        String nonceA = nonce();
+        String signatureA = MockPayGatewayClient.hmacSha256Hex(
+                appProperties.getPayment().getCallbackSecret(), ts + "\n" + nonceA + "\n" + bodyA);
+        String bodyB = callbackBody(payNo, "TXB" + suffix(), "0.01", "SUCCESS");
+        String nonceB = nonce();
+        String signatureB = MockPayGatewayClient.hmacSha256Hex(
+                appProperties.getPayment().getCallbackSecret(), ts + "\n" + nonceB + "\n" + bodyB);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<ResponseEntity<String>> first = () -> {
+            start.await(5, TimeUnit.SECONDS);
+            return callback(bodyA, ts, nonceA, signatureA);
+        };
+        Callable<ResponseEntity<String>> second = () -> {
+            start.await(5, TimeUnit.SECONDS);
+            return callback(bodyB, ts, nonceB, signatureB);
+        };
+        List<Future<ResponseEntity<String>>> futures = List.of(pool.submit(first), pool.submit(second));
+        start.countDown();
+        for (Future<ResponseEntity<String>> future : futures) {
+            ResponseEntity<String> response = future.get(30, TimeUnit.SECONDS);
+            assertThat(response.getStatusCode().value()).as("body=%s", response.getBody()).isEqualTo(200);
+        }
+        pool.shutdown();
+
+        assertThat(paymentEventCounter.count()).as("并发回调只能发布一次 PaymentSucceededEvent").isEqualTo(1);
+        assertThat((String) JsonPath.read(get("/api/v1/orders/" + orderId, customerToken).getBody(),
+                "$.data.status")).isEqualTo("PAID");
+        ResponseEntity<String> payment = get(PAYMENTS + "/" + payNo, customerToken);
+        assertThat((String) JsonPath.read(payment.getBody(), "$.data.status")).isEqualTo("SUCCESS");
+    }
+
     @Test
     void paymentForMissingOrderOrUnknownPayNoReturns404() throws Exception {
         String customerToken = login("customer", "customer123");
@@ -214,6 +302,33 @@ class PaymentApiIntegrationTest {
         ResponseEntity<String> unknownPayNo = get(PAYMENTS + "/PAY-UNKNOWN", customerToken);
         assertThat(unknownPayNo.getStatusCode().value()).isEqualTo(404);
         assertThat(codeOf(unknownPayNo)).isEqualTo(40401);
+    }
+
+    @TestConfiguration
+    static class EventConfig {
+
+        @Bean
+        PaymentEventCounter paymentEventCounter() {
+            return new PaymentEventCounter();
+        }
+    }
+
+    static class PaymentEventCounter {
+
+        private final AtomicInteger count = new AtomicInteger();
+
+        @EventListener
+        public void onPaymentSucceeded(PaymentSucceededEvent event) {
+            count.incrementAndGet();
+        }
+
+        int count() {
+            return count.get();
+        }
+
+        void reset() {
+            count.set(0);
+        }
     }
 
     private String createPayment(String customerToken, long orderId) throws Exception {

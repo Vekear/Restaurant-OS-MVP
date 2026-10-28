@@ -50,22 +50,26 @@ class AdminApiIntegrationTest {
     @Test
     void adminUserListMasksPhoneAndDisableTakesEffectImmediately() throws Exception {
         String adminToken = login("admin", "admin123");
-        String users = get("/api/v1/admin/users?page=1&size=100", adminToken);
-        assertThat(codeOf(users)).isZero();
-        List<Map<String, Object>> records = JsonPath.read(users, "$.data.list");
-        assertThat(records).isNotEmpty();
-        Map<String, Object> customer = records.stream()
-                .filter(row -> "customer".equals(row.get("username")))
-                .findFirst().orElseThrow();
-        assertThat(customer.get("phone").toString()).isEqualTo("139****0003");
 
+        // H-2：不依赖种子 customer 是否出现在 size=100 首页；自建用户 + keyword 精确定位。
         String username = "adm" + suffix();
+        String phone = "139" + randomDigits(8);
         String registered = post("/api/v1/auth/register",
                 Map.of("username", username, "password", "pass1234"), null);
         assertThat(codeOf(registered)).isZero();
         long userId = ((Number) JsonPath.read(registered, "$.data.user.id")).longValue();
         String userToken = JsonPath.read(registered, "$.data.token");
+        assertThat(codeOf(put("/api/v1/auth/profile", Map.of("phone", phone), userToken))).isZero();
         assertThat(codeOf(get("/api/v1/auth/me", userToken))).isZero();
+
+        String users = get("/api/v1/admin/users?keyword=" + username + "&page=1&size=10", adminToken);
+        assertThat(codeOf(users)).isZero();
+        List<Map<String, Object>> records = JsonPath.read(users, "$.data.list");
+        Map<String, Object> customer = records.stream()
+                .filter(row -> username.equals(row.get("username")))
+                .findFirst().orElseThrow();
+        assertThat(((Number) customer.get("id")).longValue()).isEqualTo(userId);
+        assertThat(customer.get("phone").toString()).isEqualTo(maskPhone(phone));
 
         String disabled = patch("/api/v1/admin/users/" + userId + "/status",
                 Map.of("status", "DISABLED", "reason", "违规测试"), adminToken);
@@ -88,7 +92,7 @@ class AdminApiIntegrationTest {
         assertThat(codeOf(selfDisable.getBody())).isEqualTo(40918);
 
         ResponseEntity<String> customerList = exchange("/api/v1/admin/users", HttpMethod.GET, null,
-                login("customer", "customer123"));
+                userToken);
         assertThat(customerList.getStatusCode().value()).isEqualTo(403);
         assertThat(codeOf(customerList.getBody())).isEqualTo(40301);
     }
@@ -317,6 +321,19 @@ class AdminApiIntegrationTest {
 
     private String suffix() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 6);
+    }
+
+    private static String randomDigits(int length) {
+        StringBuilder builder = new StringBuilder();
+        String seed = String.valueOf(Math.abs(System.nanoTime()));
+        for (int i = 0; i < length; i++) {
+            builder.append(seed.charAt(i % seed.length()));
+        }
+        return builder.toString();
+    }
+
+    private static String maskPhone(String phone) {
+        return phone.substring(0, 3) + "****" + phone.substring(7);
     }
 
     @SuppressWarnings("unused")

@@ -154,6 +154,7 @@ public class DineInSessionService {
             throw new BizException(ErrorCode.MERCHANT_UNAVAILABLE, "商家不存在或不可用");
         }
         String userId = String.valueOf(user.getId());
+        table = releaseExpiredOccupant(table);
         if ("OCCUPIED".equals(table.getStatus())) {
             TableSession current = table.getCurrentSessionId() == null
                     ? null : tableSessionMapper.selectById(table.getCurrentSessionId());
@@ -215,6 +216,28 @@ public class DineInSessionService {
                 table.getId(), table.getTableNo(), session.getId(), user.getId());
         TableInfo latest = tableInfoMapper.selectById(table.getId());
         return toView(toSnapshot(session), latest == null ? table : latest, null);
+    }
+
+    /**
+     * 桌台被“已过期但未释放”的会话占用时先惰性释放，使重新扫码/绑桌成功而不是 40910
+     * （T31 缺口：旧逻辑只把会话置 EXPIRED，桌台长期 OCCUPIED）。
+     */
+    private TableInfo releaseExpiredOccupant(TableInfo table) {
+        if (!"OCCUPIED".equals(table.getStatus()) || table.getCurrentSessionId() == null) {
+            return table;
+        }
+        TableSession current = tableSessionMapper.selectById(table.getCurrentSessionId());
+        if (current == null) {
+            return table;
+        }
+        boolean expiredStatus = "EXPIRED".equals(current.getStatus());
+        boolean activeExpired = "ACTIVE".equals(current.getStatus())
+                && current.getExpireAt() != null && current.getExpireAt().isBefore(LocalDateTime.now());
+        if (!expiredStatus && !activeExpired) {
+            return table;
+        }
+        tableReleaseService.releaseExpired(table.getId(), current.getId());
+        return requireTable(table.getId());
     }
 
     private void renew(TableSession session) {

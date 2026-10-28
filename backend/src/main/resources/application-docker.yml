@@ -21,6 +21,14 @@ logging:
     root: INFO
     com.restaurant: INFO
 
+# 容器/生产环境默认关闭 API 文档（M-02）；如确需排障可临时设置
+# SPRINGDOC_API_DOCS_ENABLED=true / SPRINGDOC_SWAGGER_UI_ENABLED=true，用完即关。
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
+
 app:
   storage:
     local:

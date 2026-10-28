@@ -237,6 +237,12 @@ public class AppProperties {
 
         /** 其余已认证接口：按用户 + 方法 + 路径计。 */
         private int api = 120;
+
+        /**
+         * 受信反向代理（逗号分隔的精确 IP 或 CIDR）。只有 remoteAddr 命中此列表时才采信
+         * {@code X-Real-IP} / {@code X-Forwarded-For}；留空表示不信任任何代理，仅使用直连地址。
+         */
+        private String trustedProxies = "127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7";
     }
 
     /** 定时任务开关（仅用于测试环境关闭后台任务）。 */

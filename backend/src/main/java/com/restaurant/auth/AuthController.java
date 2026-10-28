@@ -8,6 +8,7 @@ import com.restaurant.auth.vo.AuthTokenView;
 import com.restaurant.auth.vo.LogoutView;
 import com.restaurant.auth.vo.UserView;
 import com.restaurant.common.api.Result;
+import com.restaurant.common.config.AppProperties;
 import com.restaurant.common.config.OpenApiConfig;
 import com.restaurant.common.constant.ApiConstants;
 import com.restaurant.common.util.ClientIpUtils;
@@ -41,13 +42,15 @@ public class AuthController {
 
     private final AuthService authService;
 
+    private final AppProperties appProperties;
+
     @Operation(summary = "账号密码登录（Web / 管理后台）",
             description = "ADMIN / MERCHANT / CUSTOMER 共用；用户名不存在或密码错误统一 40101，账号禁用 40304，"
                     + "同一 IP 每分钟最多 5 次（429/42901）")
     @PostMapping("/login")
     public Result<AuthTokenView> login(@Valid @RequestBody LoginRequest request,
                                        HttpServletRequest httpRequest) {
-        return Result.success(authService.login(request, ClientIpUtils.resolve(httpRequest),
+        return Result.success(authService.login(request, clientIp(httpRequest),
                 userAgent(httpRequest)));
     }
 
@@ -63,7 +66,7 @@ public class AuthController {
     @PostMapping("/wechat/login")
     public Result<AuthTokenView> wechatLogin(@Valid @RequestBody WxLoginRequest request,
                                              HttpServletRequest httpRequest) {
-        return Result.success(authService.wechatLogin(request, ClientIpUtils.resolve(httpRequest),
+        return Result.success(authService.wechatLogin(request, clientIp(httpRequest),
                 userAgent(httpRequest)));
     }
 
@@ -79,7 +82,7 @@ public class AuthController {
     @PostMapping("/logout")
     public Result<LogoutView> logout(@AuthenticationPrincipal UserPrincipal principal,
                                      HttpServletRequest httpRequest) {
-        authService.logout(principal, ClientIpUtils.resolve(httpRequest), userAgent(httpRequest));
+        authService.logout(principal, clientIp(httpRequest), userAgent(httpRequest));
         return Result.success(LogoutView.success());
     }
 
@@ -90,7 +93,11 @@ public class AuthController {
                                           @Valid @RequestBody UpdateProfileRequest request,
                                           HttpServletRequest httpRequest) {
         return Result.success(authService.updateProfile(principal, request,
-                ClientIpUtils.resolve(httpRequest), userAgent(httpRequest)));
+                clientIp(httpRequest), userAgent(httpRequest)));
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        return ClientIpUtils.resolve(request, appProperties.getRateLimit().getTrustedProxies());
     }
 
     private String userAgent(HttpServletRequest request) {

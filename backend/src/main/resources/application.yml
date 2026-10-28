@@ -7,7 +7,9 @@
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
-  forward-headers-strategy: framework
+  # 安全：禁止容器/框架按客户端可伪造的 Forwarded/X-Forwarded-* 重写 remoteAddr（H-01）。
+  # 代理头只在显式受信代理命中时由 ClientIpUtils 解析，见 app.rate-limit.trusted-proxies。
+  forward-headers-strategy: none
   servlet:
     encoding:
       charset: UTF-8
@@ -240,6 +242,9 @@ app:
     payment: ${RATE_LIMIT_PAYMENT:10}
     # 其余已认证接口：按用户+方法+路径限流（次/分钟）
     api: ${RATE_LIMIT_API:120}
+    # 受信反向代理（精确 IP 或 CIDR，逗号分隔）：仅这些直连地址的 X-Real-IP/X-Forwarded-For 会被采信
+    # 留空表示不信任任何代理，仅使用 remoteAddr；Nginx 部署时需包含其所在网段/地址
+    trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7}
 
   task:
     # Spring Task 总开关（测试 profile 关闭，避免后台任务干扰断言）

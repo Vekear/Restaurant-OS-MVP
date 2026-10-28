@@ -119,10 +119,10 @@ test.describe('真实后端 · 顾客地址/购物车/优惠券链路', () => {
     const username = `t49c${Date.now().toString(36).slice(-6)}${Math.floor(Math.random() * 1000)}`
     const phone = `139${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
     const registered = await request.post(`${backendBaseURL()}${API}/auth/register`, {
-      data: { username, nickname: 'T49券顾客', phone, password: 't49pass123' },
+      data: { username, nickname: 'T49券顾客', phone, password: 't49-test-pass-123' },
     })
     expect(registered.status()).toBe(200)
-    const session = await freshLogin(request, username, 't49pass123')
+    const session = await freshLogin(request, username, 't49-test-pass-123')
 
     const templates = await api(request, session.token, 'GET', '/coupons?page=1&size=5')
     expect(templates.response.status()).toBe(200)

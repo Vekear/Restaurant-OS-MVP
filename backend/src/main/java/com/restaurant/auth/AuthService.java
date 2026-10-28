@@ -55,7 +55,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final Duration LOGIN_RATE_WINDOW = Duration.ofMinutes(1);
+    private static final Duration AUTH_RATE_WINDOW = Duration.ofMinutes(1);
 
     private final UserMapper userMapper;
 
@@ -80,7 +80,7 @@ public class AuthService {
     /** 账号密码登录（Web / 管理后台）。 */
     public AuthTokenView login(LoginRequest request, String ip, String userAgent) {
         rateLimitService.checkOrThrow(CacheKeys.rateLoginKey(ip),
-                appProperties.getRateLimit().getLogin(), LOGIN_RATE_WINDOW);
+                appProperties.getRateLimit().getLogin(), AUTH_RATE_WINDOW);
         User user = userMapper.selectOne(Wrappers.<User>lambdaQuery()
                 .eq(User::getUsername, request.getUsername()));
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -104,9 +104,11 @@ public class AuthService {
         return issueToken(user);
     }
 
-    /** 顾客注册（成功即登录）。 */
+    /** 顾客注册（成功即登录）：按客户端 IP 限流，与登录入口独立计数。 */
     @Transactional
-    public AuthTokenView register(RegisterRequest request) {
+    public AuthTokenView register(RegisterRequest request, String ip) {
+        rateLimitService.checkOrThrow(CacheKeys.rateRegisterKey(ip),
+                appProperties.getRateLimit().getRegister(), AUTH_RATE_WINDOW);
         String username = request.getUsername();
         if (userMapper.exists(Wrappers.<User>lambdaQuery().eq(User::getUsername, username))) {
             throw new BizException(ErrorCode.UNIQUE_CONFLICT, "用户名已存在");
@@ -137,6 +139,8 @@ public class AuthService {
      */
     @Transactional
     public AuthTokenView wechatLogin(WxLoginRequest request, String ip, String userAgent) {
+        rateLimitService.checkOrThrow(CacheKeys.rateWechatKey(ip),
+                appProperties.getRateLimit().getWechat(), AUTH_RATE_WINDOW);
         WxSession session;
         try {
             session = wxSessionClient.code2Session(request.getCode());

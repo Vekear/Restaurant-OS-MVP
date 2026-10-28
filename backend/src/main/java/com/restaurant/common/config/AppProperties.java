@@ -229,6 +229,12 @@ public class AppProperties {
         /** 登录：按客户端 IP 计。 */
         private int login = 5;
 
+        /** 顾客注册：按客户端 IP 计（与登录独立计数）。 */
+        private int register = 5;
+
+        /** 微信小程序登录：按客户端 IP 计（与登录独立计数）。 */
+        private int wechat = 5;
+
         /** 创建订单：按用户计。 */
         private int order = 10;
 

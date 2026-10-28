@@ -22,6 +22,10 @@ public final class CacheKeys {
     // ---------- 限流（固定窗口，单位：分钟） ----------
     private static final String RATE_LOGIN_PREFIX = "rate:login:";
 
+    private static final String RATE_REGISTER_PREFIX = "rate:register:";
+
+    private static final String RATE_WECHAT_PREFIX = "rate:wechat:";
+
     private static final String RATE_ORDER_PREFIX = "rate:order:";
 
     private static final String RATE_PAY_PREFIX = "rate:pay:";
@@ -39,6 +43,16 @@ public final class CacheKeys {
 
     public static String rateLoginKey(String ip) {
         return RATE_LOGIN_PREFIX + ip;
+    }
+
+    /** 顾客注册限流 key：按客户端 IP 计，与登录刻意使用不同前缀避免互相消耗配额。 */
+    public static String rateRegisterKey(String ip) {
+        return RATE_REGISTER_PREFIX + ip;
+    }
+
+    /** 微信小程序登录限流 key：按客户端 IP 计，与账号密码登录独立计数。 */
+    public static String rateWechatKey(String ip) {
+        return RATE_WECHAT_PREFIX + ip;
     }
 
     public static String rateOrderKey(Long userId) {

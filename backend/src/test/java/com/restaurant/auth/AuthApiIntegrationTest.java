@@ -171,6 +171,50 @@ class AuthApiIntegrationTest {
     }
 
     @Test
+    void registerIsRateLimitedPerIpAfterFiveAttemptsAndIndependentFromLogin() {
+        for (int i = 0; i < 5; i++) {
+            ResponseEntity<String> registered = post(REGISTER, newRegistration(), null);
+            assertThat(registered.getStatusCode().value()).isEqualTo(200);
+            assertThat(codeOf(registered)).isZero();
+        }
+        ResponseEntity<String> limited = post(REGISTER, newRegistration(), null);
+        assertThat(limited.getStatusCode().value()).isEqualTo(429);
+        assertThat(codeOf(limited)).isEqualTo(42901);
+        String retryAfter = limited.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+        assertThat(retryAfter).isNotNull();
+        assertThat(Long.parseLong(retryAfter)).isPositive();
+
+        // 注册与账号密码登录使用不同 key：注册被限流不影响登录，反之亦然
+        assertThat(stringRedisTemplate.keys("rate:register:*")).isNotEmpty();
+        assertThat(stringRedisTemplate.keys("rate:login:*")).isEmpty();
+        ResponseEntity<String> login = post(LOGIN, credentials("customer", "customer123"), null);
+        assertThat(login.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void wechatLoginIsRateLimitedPerIpAfterFiveAttemptsAndIndependentFromLogin() {
+        for (int i = 0; i < 5; i++) {
+            ResponseEntity<String> loggedIn = post(WECHAT_LOGIN,
+                    Map.of("code", "rate-limit-" + UUID.randomUUID()), null);
+            assertThat(loggedIn.getStatusCode().value()).isEqualTo(200);
+        }
+        ResponseEntity<String> limited = post(WECHAT_LOGIN,
+                Map.of("code", "rate-limit-" + UUID.randomUUID()), null);
+        assertThat(limited.getStatusCode().value()).isEqualTo(429);
+        assertThat(codeOf(limited)).isEqualTo(42901);
+        String retryAfter = limited.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+        assertThat(retryAfter).isNotNull();
+        assertThat(Long.parseLong(retryAfter)).isPositive();
+
+        // 微信登录 key 与账号密码登录/注册互相独立
+        assertThat(stringRedisTemplate.keys("rate:wechat:*")).isNotEmpty();
+        assertThat(stringRedisTemplate.keys("rate:login:*")).isEmpty();
+        assertThat(stringRedisTemplate.keys("rate:register:*")).isEmpty();
+        ResponseEntity<String> login = post(LOGIN, credentials("customer", "customer123"), null);
+        assertThat(login.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
     void wechatLoginIsIdempotentForSameCodeAndNeverLeaksSessionKey() {
         String code = "test-code-" + UUID.randomUUID();
         ResponseEntity<String> first = post(WECHAT_LOGIN, Map.of("code", code), null);
@@ -263,6 +307,13 @@ class AuthApiIntegrationTest {
 
     private Map<String, String> credentials(String username, String password) {
         return Map.of("username", username, "password", password);
+    }
+
+    private Map<String, String> newRegistration() {
+        Map<String, String> payload = new HashMap<>();
+        payload.put("username", "rl" + UUID.randomUUID().toString().replace("-", "").substring(0, 10));
+        payload.put("password", "secret123");
+        return payload;
     }
 
     private int codeOf(ResponseEntity<String> response) {

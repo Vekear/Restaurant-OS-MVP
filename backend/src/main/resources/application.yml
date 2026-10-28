@@ -236,6 +236,10 @@ app:
   rate-limit:
     # 登录：按客户端 IP 限流（次/分钟）
     login: ${RATE_LIMIT_LOGIN:5}
+    # 顾客注册：按客户端 IP 限流（次/分钟），与登录独立计数
+    register: ${RATE_LIMIT_REGISTER:5}
+    # 微信小程序登录：按客户端 IP 限流（次/分钟），与登录独立计数
+    wechat: ${RATE_LIMIT_WECHAT:5}
     # 创建订单：按用户限流（次/分钟）
     order: ${RATE_LIMIT_ORDER:10}
     # 支付/模拟支付：按用户限流（次/分钟）

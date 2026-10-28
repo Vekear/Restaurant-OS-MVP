@@ -54,15 +54,19 @@ public class AuthController {
                 userAgent(httpRequest)));
     }
 
-    @Operation(summary = "顾客注册", description = "注册成功直接返回 token；用户名/手机号重复返回 40914")
+    @Operation(summary = "顾客注册",
+            description = "注册成功直接返回 token；用户名/手机号重复返回 40914；"
+                    + "同一 IP 每分钟最多 5 次（429/42901，与登录入口独立计数）")
     @PostMapping("/register")
-    public Result<AuthTokenView> register(@Valid @RequestBody RegisterRequest request) {
-        return Result.success(authService.register(request));
+    public Result<AuthTokenView> register(@Valid @RequestBody RegisterRequest request,
+                                          HttpServletRequest httpRequest) {
+        return Result.success(authService.register(request, clientIp(httpRequest)));
     }
 
     @Operation(summary = "微信小程序登录",
             description = "用 wx.login 的 code 换取 openid；首次登录自动建号，同一 openid 幂等；"
-                    + "mock 模式（默认）不访问微信接口，session_key 永不下发")
+                    + "mock 模式（默认）不访问微信接口，session_key 永不下发；"
+                    + "同一 IP 每分钟最多 5 次（429/42901，与登录入口独立计数）")
     @PostMapping("/wechat/login")
     public Result<AuthTokenView> wechatLogin(@Valid @RequestBody WxLoginRequest request,
                                              HttpServletRequest httpRequest) {

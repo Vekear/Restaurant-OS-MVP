@@ -23,6 +23,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * 两条入口签发同一套 JWT，由 {@link JwtAuthenticationFilter} 统一校验。
  * 白名单严格对齐 {@code docs/02-api.md §1}；{@code /api/v1/admin/**} 仅 ADMIN、
  * {@code /api/v1/merchant/**} 仅 MERCHANT，其余 {@code /api/v1/**} 需登录。
+ * Actuator 仅 {@code /actuator/health} 匿名公开，其余 {@code /actuator/**} 需 ADMIN（L-03）。
  * 未认证/无权限分别由 {@link RestAuthenticationEntryPoint}、{@link RestAccessDeniedHandler}
  * 输出统一 JSON（40101/40102/40103、40301）。
  */
@@ -66,9 +67,13 @@ public class SecurityConfig {
                                 "/api/v1/menu/**",
                                 "/api/v1/merchants/**",
                                 "/api/v1/public/**").permitAll()
+                        // 健康检查保持匿名（容器/K8s 探针）；其余 actuator 端点仅 ADMIN，
+                        // 避免 8080 直连绕过 Nginx 的 /actuator 白名单
                         .requestMatchers(
                                 "/actuator/health",
-                                "/actuator/health/**",
+                                "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",

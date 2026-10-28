@@ -9,6 +9,7 @@ import com.restaurant.storage.mapper.FileObjectMapper;
 import com.restaurant.storage.vo.FileObjectView;
 import com.restaurant.storage.vo.FilePolicyView;
 import com.aliyun.oss.OSS;
+import com.aliyun.oss.OSSException;
 import com.aliyun.oss.model.ObjectMetadata;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -132,6 +133,12 @@ public class OssFileStorage implements FileStorageService {
                 allowedContentTypes(), "200");
     }
 
+    /**
+     * 登记前端直传完成的文件。
+     *
+     * <p>M-02：登记前先 HeadObject 校验对象确实存在（不能只信前端回传的 objectKey/size）；
+     * 对象不存在返回 40401，SDK/网络异常返回 STORAGE_ERROR，且日志不含 AccessKey。
+     */
     @Override
     public FileObjectView confirm(FileConfirmRequest request, Long uploaderId) {
         String bizType = FileValidation.requireAnyBizType(request.getBizType());
@@ -152,6 +159,7 @@ public class OssFileStorage implements FileStorageService {
         if (originalName != null && originalName.length() > 120) {
             originalName = originalName.substring(0, 120);
         }
+        verifyObjectExists(objectKey);
         FileObject fileObject = new FileObject();
         fileObject.setBizType(bizType);
         fileObject.setObjectKey(objectKey);
@@ -166,6 +174,40 @@ public class OssFileStorage implements FileStorageService {
         return new FileObjectView(fileObject.getId(), fileObject.getBizType(), fileObject.getObjectKey(),
                 fileObject.getUrl(), fileObject.getStorageType(), fileObject.getSize(),
                 fileObject.getContentType(), fileObject.getOriginalName(), fileObject.getCreatedAt());
+    }
+
+    private void verifyObjectExists(String objectKey) {
+        OSS client = null;
+        ObjectMetadata metadata;
+        try {
+            client = ossClientProvider.createClient();
+            metadata = client.headObject(appProperties.getStorage().getOss().getBucket(), objectKey);
+        } catch (OSSException e) {
+            if (isObjectMissing(e)) {
+                throw new BizException(ErrorCode.NOT_FOUND, "文件不存在或上传未完成，请重新上传");
+            }
+            log.warn("OSS 文件存在性校验失败, objectKey={}, errorCode={}, error={}",
+                    objectKey, e.getErrorCode(), e.getMessage());
+            throw new BizException(ErrorCode.STORAGE_ERROR, "OSS 存储校验失败，请稍后重试");
+        } catch (RuntimeException e) {
+            log.warn("OSS 文件存在性校验失败, objectKey={}, error={}", objectKey, e.getMessage());
+            throw new BizException(ErrorCode.STORAGE_ERROR, "OSS 存储校验失败，请稍后重试");
+        } finally {
+            shutdownQuietly(client);
+        }
+        if (metadata == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "文件不存在或上传未完成，请重新上传");
+        }
+    }
+
+    private boolean isObjectMissing(OSSException exception) {
+        String errorCode = exception.getErrorCode();
+        if (errorCode != null
+                && ("NoSuchKey".equalsIgnoreCase(errorCode) || "NotFound".equalsIgnoreCase(errorCode))) {
+            return true;
+        }
+        String message = exception.getMessage();
+        return message != null && message.contains("NoSuchKey");
     }
 
     private void deleteObjectQuietly(String objectKey) {

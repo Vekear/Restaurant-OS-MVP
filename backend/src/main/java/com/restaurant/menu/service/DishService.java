@@ -6,7 +6,6 @@ import com.restaurant.common.api.ErrorCode;
 import com.restaurant.common.api.PageResult;
 import com.restaurant.common.config.AppProperties;
 import com.restaurant.common.exception.BizException;
-import com.restaurant.common.util.CacheKeys;
 import com.restaurant.menu.Category;
 import com.restaurant.menu.Dish;
 import com.restaurant.menu.dto.DishCreateRequest;
@@ -22,7 +21,6 @@ import com.restaurant.menu.vo.DishSummaryView;
 import com.restaurant.menu.vo.StockView;
 import com.restaurant.security.RoleGuard;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -37,7 +35,7 @@ import java.util.stream.Collectors;
  * 商家端菜品与库存（{@code docs/02-api.md §16.5–§16.13}）。
  *
  * <p>库存唯一写入口：{@code adjustStock} 使用原子 UPDATE，{@code setStock} 使用乐观锁重试；
- * 所有写操作都会立即失效公开菜单缓存（分类数量/分页结果/详情）。
+ * 所有写操作在事务提交后失效公开菜单缓存（分类数量/分页结果/详情），回滚时不失效。
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +50,8 @@ public class DishService {
     private final RoleGuard roleGuard;
 
     private final AppProperties appProperties;
+
+    private final MenuCacheEvictor menuCacheEvictor;
 
     /** 商家端菜品分页（含下架，按 sort ASC, id ASC）。 */
     public PageResult<DishSummaryView> listForMerchant(Long categoryId, String keyword, String status,
@@ -83,8 +83,6 @@ public class DishService {
 
     /** 创建菜品。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public DishDetailView create(DishCreateRequest request) {
         Long merchantId = roleGuard.requireMerchantId();
         requireOwnedCategory(request.getCategoryId(), merchantId);
@@ -96,13 +94,12 @@ public class DishService {
                 request.getStock(), request.getSort(), request.getStatus());
         dish.setSales(0);
         dishMapper.insert(dish);
+        menuCacheEvictor.evictDishAfterCommit(merchantId, dish.getId());
         return toDetail(dish);
     }
 
     /** 全量更新菜品（改价不影响已下单快照）。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public DishDetailView update(Long id, DishUpdateRequest request) {
         Long merchantId = roleGuard.requireMerchantId();
         Dish dish = requireOwnedDish(id, merchantId);
@@ -114,41 +111,42 @@ public class DishService {
         if (dishMapper.updateById(dish) == 0) {
             throw new BizException(ErrorCode.STATE_CONFLICT, "菜品已被修改，请重试");
         }
+        menuCacheEvictor.evictDishAfterCommit(merchantId, dish.getId());
         return toDetail(dish);
     }
 
     /** 逻辑删除菜品（订单明细快照保留）。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public DeletedView delete(Long id) {
-        Dish dish = requireOwnedDish(id, roleGuard.requireMerchantId());
+        Long merchantId = roleGuard.requireMerchantId();
+        Dish dish = requireOwnedDish(id, merchantId);
         dishMapper.deleteById(dish.getId());
+        menuCacheEvictor.evictDishAfterCommit(merchantId, dish.getId());
         return DeletedView.yes();
     }
 
     /** 上下架：立即失效菜单缓存。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public DishDetailView changeStatus(Long id, DishStatusRequest request) {
-        Dish dish = requireOwnedDish(id, roleGuard.requireMerchantId());
+        Long merchantId = roleGuard.requireMerchantId();
+        Dish dish = requireOwnedDish(id, merchantId);
         dish.setStatus(request.getStatus());
         if (dishMapper.updateById(dish) == 0) {
             throw new BizException(ErrorCode.STATE_CONFLICT, "菜品已被修改，请重试");
         }
+        menuCacheEvictor.evictDishAfterCommit(merchantId, dish.getId());
         return toDetail(dish);
     }
 
     /** 绝对库存设置（乐观锁，冲突重试 3 次）。 */
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
+    @Transactional
     public StockView setStock(Long id, StockSetRequest request) {
         Long merchantId = roleGuard.requireMerchantId();
         for (int attempt = 0; attempt < STOCK_SET_MAX_ATTEMPTS; attempt++) {
             Dish dish = requireOwnedDish(id, merchantId);
             int version = dish.getVersion() == null ? 0 : dish.getVersion();
             if (dishMapper.setStock(id, merchantId, request.getStock(), version) > 0) {
+                menuCacheEvictor.evictDishAfterCommit(merchantId, id);
                 return stockView(id, request.getStock());
             }
         }
@@ -156,8 +154,7 @@ public class DishService {
     }
 
     /** 增量库存调整（原子 UPDATE；扣减为负 → 40901）。 */
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
+    @Transactional
     public StockView adjustStock(Long id, StockAdjustRequest request) {
         Long merchantId = roleGuard.requireMerchantId();
         if (request.getDelta() == 0) {
@@ -167,6 +164,7 @@ public class DishService {
         if (dishMapper.adjustStock(id, merchantId, request.getDelta()) == 0) {
             throw new BizException(ErrorCode.STOCK_INSUFFICIENT, "库存不足，无法扣减");
         }
+        menuCacheEvictor.evictDishAfterCommit(merchantId, id);
         Dish updated = dishMapper.selectById(id);
         int stock = updated == null || updated.getStock() == null ? 0 : updated.getStock();
         return stockView(id, stock);

@@ -3,7 +3,6 @@ package com.restaurant.menu.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.restaurant.common.api.ErrorCode;
 import com.restaurant.common.exception.BizException;
-import com.restaurant.common.util.CacheKeys;
 import com.restaurant.menu.Category;
 import com.restaurant.menu.dto.CategoryCreateRequest;
 import com.restaurant.menu.dto.CategoryUpdateRequest;
@@ -13,7 +12,6 @@ import com.restaurant.menu.vo.CategoryView;
 import com.restaurant.menu.vo.DeletedView;
 import com.restaurant.security.RoleGuard;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +22,8 @@ import java.util.stream.Collectors;
 /**
  * 商家端分类管理（{@code docs/02-api.md §16.1–§16.4}）。
  *
- * <p>分类增删改后立即失效公开菜单缓存（分类列表 + 菜品分页 + 菜品详情），
- * 单实例 MVP 直接 {@code allEntries=true}，避免遗漏跨商家缓存键。
+ * <p>分类增删改在事务提交后失效公开菜单缓存（分类列表 + 该商家菜品分页 + 菜品详情），
+ * 回滚时不失效；单实例 MVP 按 merchantId 精准失效。
  */
 @Service
 @RequiredArgsConstructor
@@ -36,6 +34,8 @@ public class CategoryService {
     private final DishMapper dishMapper;
 
     private final RoleGuard roleGuard;
+
+    private final MenuCacheEvictor menuCacheEvictor;
 
     /** 商家端分类列表（含 DISABLED，dishCount 统计未删除菜品）。 */
     public List<CategoryView> listForMerchant() {
@@ -53,8 +53,6 @@ public class CategoryService {
 
     /** 创建分类。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public CategoryView create(CategoryCreateRequest request) {
         Long merchantId = roleGuard.requireMerchantId();
         String name = request.getName().trim();
@@ -66,13 +64,12 @@ public class CategoryService {
         category.setStatus("ENABLED");
         category.setDeleted(0);
         categoryMapper.insert(category);
+        menuCacheEvictor.evictCategoryAfterCommit(merchantId);
         return toView(category, 0L);
     }
 
     /** 更新分类（名称/排序/状态）。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public CategoryView update(Long id, CategoryUpdateRequest request) {
         Long merchantId = roleGuard.requireMerchantId();
         Category category = requireOwnedCategory(id, merchantId);
@@ -90,13 +87,12 @@ public class CategoryService {
         if (categoryMapper.updateById(category) == 0) {
             throw new BizException(ErrorCode.STATE_CONFLICT, "分类已被修改，请重试");
         }
+        menuCacheEvictor.evictCategoryAfterCommit(merchantId);
         return toView(category, countDishes(category.getId()));
     }
 
     /** 删除分类：存在未删除菜品时拒绝（40915）。 */
     @Transactional
-    @CacheEvict(cacheNames = {CacheKeys.MENU_CATEGORIES, CacheKeys.MENU_DISHES, CacheKeys.MENU_DISH},
-            allEntries = true)
     public DeletedView delete(Long id) {
         Long merchantId = roleGuard.requireMerchantId();
         requireOwnedCategory(id, merchantId);
@@ -104,6 +100,7 @@ public class CategoryService {
             throw new BizException(ErrorCode.CATEGORY_NOT_EMPTY);
         }
         categoryMapper.deleteById(id);
+        menuCacheEvictor.evictCategoryAfterCommit(merchantId);
         return DeletedView.yes();
     }
 

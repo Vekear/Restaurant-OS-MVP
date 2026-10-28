@@ -34,7 +34,8 @@ import java.util.stream.Collectors;
  * 公开菜单查询（{@code docs/02-api.md §6}、{@code docs/01-architecture.md §13}）。
  *
  * <p>缓存策略：分类/菜品分页/菜品详情/店铺信息均 10 分钟 TTL，key 由 {@code CacheKeys} 常量拼接；
- * 商家端任何写操作通过 {@code @CacheEvict(allEntries = true)} 立即失效。
+ * 商家端任何写操作（库存/菜品/分类）在事务提交后通过 {@link MenuCacheEvictor} 按 merchantId/dishId 精准失效，
+ * 回滚时不失效，避免缓存与数据库不一致。
  */
 @Service
 @RequiredArgsConstructor

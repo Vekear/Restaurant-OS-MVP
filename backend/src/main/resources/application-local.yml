@@ -22,6 +22,13 @@ logging:
     org.springframework.web.socket: INFO
     org.flywaydb: INFO
 
+# local 显式开启 API 文档（生产默认关闭，见 application.yml）
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+
 app:
   payment:
     mock-charge-amount: 0.01

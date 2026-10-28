@@ -1,0 +1,4 @@
+# 生产配置 fail-fast（docs/05-security.md M-01）：
+# 在 DataSource / Flyway / MyBatis 初始化前校验密钥，缺失或仍为开发默认值时拒绝启动。
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.restaurant.common.config.ProductionConfigFailFastEnvironmentPostProcessor

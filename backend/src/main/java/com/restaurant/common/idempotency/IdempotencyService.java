@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -29,7 +30,9 @@ import java.util.function.Supplier;
  *   <li>校验 {@code Idempotency-Key}（8–64）；</li>
  *   <li>Redis {@code idem:{userId}:{key}} 保存请求体哈希，同 key 不同请求体 → 40904；</li>
  *   <li>数据库 {@code idempotency_record} 唯一键保证只执行一次，成功响应体用于回放
- *       （表结构无 request_hash 列，哈希落在 Redis sidecar）。</li>
+ *       （表结构无 request_hash 列，哈希落在 Redis sidecar）；</li>
+ *   <li>回放前校验记录归属：数据库命中必须按 {@code (user_id, idempotency_key)} 查，
+ *       其他用户复用同一 key → 40904 且绝不回放他人响应体（H-02 修复）。</li>
  * </ol>
  */
 @Slf4j
@@ -73,14 +76,21 @@ public class IdempotencyService {
             }
         }
 
-        IdempotencyRecord record = findRecord(key);
+        IdempotencyRecord record = findOwnedRecord(key, userId);
+        if (record == null) {
+            // 数据库唯一键是全局的：若该 key 已被其他用户占用，视为冲突，不回放他人响应体
+            IdempotencyRecord otherUserRecord = findRecordByKey(key);
+            if (otherUserRecord != null) {
+                throw conflict("Idempotency-Key 已被其他用户使用");
+            }
+        }
         if (record != null && "SUCCESS".equals(record.getStatus())) {
             return new IdempotentResult<>(null, record.getResponseBody());
         }
         if (record != null && "PROCESSING".equals(record.getStatus())) {
-            IdempotencyRecord finished = waitForSuccess(key);
+            IdempotencyRecord finished = waitForSuccess(key, userId);
             if (finished == null) {
-                throw new BizException(ErrorCode.IDEMPOTENCY_CONFLICT, "相同请求正在处理中，请稍后重试");
+                throw conflict("相同请求正在处理中，请稍后重试");
             }
             return new IdempotentResult<>(null, finished.getResponseBody());
         }
@@ -94,11 +104,21 @@ public class IdempotencyService {
             try {
                 idempotencyRecordMapper.insert(record);
             } catch (DuplicateKeyException e) {
-                IdempotencyRecord concurrent = findRecord(key);
-                if (concurrent != null && "SUCCESS".equals(concurrent.getStatus())) {
+                IdempotencyRecord concurrent = findRecordByKey(key);
+                if (concurrent == null) {
+                    throw conflict("相同请求正在处理中，请稍后重试");
+                }
+                if (!Objects.equals(concurrent.getUserId(), userId)) {
+                    throw conflict("Idempotency-Key 已被其他用户使用");
+                }
+                if ("SUCCESS".equals(concurrent.getStatus())) {
                     return new IdempotentResult<>(null, concurrent.getResponseBody());
                 }
-                throw new BizException(ErrorCode.IDEMPOTENCY_CONFLICT, "相同请求正在处理中，请稍后重试");
+                IdempotencyRecord finished = waitForSuccess(key, userId);
+                if (finished != null) {
+                    return new IdempotentResult<>(null, finished.getResponseBody());
+                }
+                throw conflict("相同请求正在处理中，请稍后重试");
             }
         }
 
@@ -131,14 +151,22 @@ public class IdempotencyService {
         }
     }
 
-    private IdempotencyRecord findRecord(String key) {
+    /** 仅返回属于当前用户的幂等记录；这是回放/删除/等待的唯一入口。 */
+    private IdempotencyRecord findOwnedRecord(String key, Long userId) {
+        return idempotencyRecordMapper.selectOne(Wrappers.<IdempotencyRecord>lambdaQuery()
+                .eq(IdempotencyRecord::getUserId, userId)
+                .eq(IdempotencyRecord::getIdempotencyKey, key));
+    }
+
+    /** 全局按 key 查记录，仅用于判断“key 是否已被其他用户占用”，不会用于回放。 */
+    private IdempotencyRecord findRecordByKey(String key) {
         return idempotencyRecordMapper.selectOne(Wrappers.<IdempotencyRecord>lambdaQuery()
                 .eq(IdempotencyRecord::getIdempotencyKey, key));
     }
 
-    private IdempotencyRecord waitForSuccess(String key) {
+    private IdempotencyRecord waitForSuccess(String key, Long userId) {
         for (int i = 0; i < WAIT_TIMES; i++) {
-            IdempotencyRecord record = findRecord(key);
+            IdempotencyRecord record = findOwnedRecord(key, userId);
             if (record != null && "SUCCESS".equals(record.getStatus())) {
                 return record;
             }
@@ -153,6 +181,10 @@ public class IdempotencyService {
             }
         }
         return null;
+    }
+
+    private BizException conflict(String message) {
+        return new BizException(ErrorCode.IDEMPOTENCY_CONFLICT, message);
     }
 
     private IdempotencyRecord newRecord(String key, Long userId, String endpoint) {

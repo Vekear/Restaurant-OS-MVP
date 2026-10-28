@@ -1,7 +1,7 @@
 /**
  * WebSocket 客户端封装（STOMP over native WebSocket）
  *
- * 后端（brief §9 / plan §1.10）：STOMP 端点 /ws，原生端点 /ws/native。
+ * STOMP 端点 /ws（ADR-0014 单通道）。
  * 本封装负责：JWT 握手头、订阅登记与断线后自动重订阅、指数退避重连、连接状态响应式暴露。
  *
  * 用法：

@@ -51,7 +51,7 @@ export const PUBLIC_CONFIG = Object.freeze({
     maxSizeMb: 5,
     allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
   },
-  websocket: { stompPath: '/ws', nativePath: '/ws/native', pollIntervalSeconds: 10 }
+  websocket: { stompPath: '/ws', pollIntervalSeconds: 10 }
 })
 
 /** CategoryView[]（docs/02-api.md §6.1）：只含可售菜品数量 */

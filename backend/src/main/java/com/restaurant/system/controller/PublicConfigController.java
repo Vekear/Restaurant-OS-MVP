@@ -53,7 +53,7 @@ public class PublicConfigController {
                         appProperties.getTable().isAllowManualInput()),
                 new PublicConfigView.Storage(fileStorageFacade.type(), fileStorageFacade.uploadMode(),
                         fileStorageFacade.maxSizeMb(), allowedTypes),
-                new PublicConfigView.Websocket(ApiConstants.WS_ENDPOINT, ApiConstants.WS_NATIVE_ENDPOINT, 10));
+                new PublicConfigView.Websocket(ApiConstants.WS_ENDPOINT, 10));
         return Result.success(view);
     }
 }

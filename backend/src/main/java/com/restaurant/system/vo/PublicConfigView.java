@@ -35,7 +35,7 @@ public record PublicConfigView(String appName,
     public record Storage(String type, String uploadMode, int maxSizeMb, List<String> allowedTypes) {
     }
 
-    /** WebSocket 地址（原生不可用时按 pollIntervalSeconds 轮询）。 */
-    public record Websocket(String stompPath, String nativePath, int pollIntervalSeconds) {
+    /** STOMP 端点地址（连接不可用时按 pollIntervalSeconds 降级轮询；实时通道唯一入口，ADR-0014）。 */
+    public record Websocket(String stompPath, int pollIntervalSeconds) {
     }
 }

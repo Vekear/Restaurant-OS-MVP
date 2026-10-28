@@ -31,11 +31,8 @@ public final class ApiConstants {
     public static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     // ---------- WebSocket ----------
-    /** STOMP 端点（纯 WebSocket，无 SockJS）。 */
+    /** STOMP 端点（纯 WebSocket，无 SockJS）；实时通道唯一入口（ADR-0014）。 */
     public static final String WS_ENDPOINT = "/ws";
-
-    /** 原生 JSON 通道端点（T08 实现）。 */
-    public static final String WS_NATIVE_ENDPOINT = "/ws/native";
 
     /** 订阅前缀。 */
     public static final String WS_TOPIC_PREFIX = "/topic";

@@ -1,6 +1,7 @@
 package com.restaurant.menu;
 
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 公开菜单 + 商家分类/菜品集成测试（真实 Tomcat + MySQL restaurant_mvp_test + Redis db15）。
@@ -197,6 +199,15 @@ class MenuApiIntegrationTest {
         assertThat(JsonPath.read(config.getBody(), "$.data.mockPayment.chargeAmount").toString())
                 .isEqualTo("0.01");
         assertThat((String) JsonPath.read(config.getBody(), "$.data.websocket.stompPath")).isEqualTo("/ws");
+        assertThat(((Number) JsonPath.read(config.getBody(), "$.data.websocket.pollIntervalSeconds"))
+                .intValue()).isEqualTo(10);
+        // ADR-0014：实时通道收敛为 STOMP，公开配置不再下发原生通道字段
+        @SuppressWarnings("unchecked")
+        Map<String, Object> websocket = JsonPath.read(config.getBody(), "$.data.websocket");
+        assertThat(websocket.keySet()).containsExactlyInAnyOrder("stompPath", "pollIntervalSeconds");
+        assertThatThrownBy(() -> JsonPath.read(config.getBody(), "$.data.websocket.nativePath"))
+                .isInstanceOf(PathNotFoundException.class);
+        assertThat(config.getBody()).doesNotContain("nativePath");
 
         ResponseEntity<String> merchant = get("/api/v1/merchants/1", null);
         assertThat(merchant.getStatusCode().value()).isEqualTo(200);

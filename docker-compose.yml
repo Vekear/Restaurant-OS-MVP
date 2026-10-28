@@ -129,7 +129,8 @@ services:
       WECHAT_APP_SECRET: "${WECHAT_APP_SECRET:-}"
       # --- 模拟支付 / 订单超时 ---
       PAYMENT_MOCK_CHARGE_AMOUNT: "${PAYMENT_MOCK_CHARGE_AMOUNT:-0.01}"
-      PAYMENT_CALLBACK_BASE_URL: http://backend:8080
+      # 回调基址：compose 用服务名 http://backend:8080；默认 127.0.0.1:8080 在 backend 容器内也指向自身
+      PAYMENT_MOCK_CALLBACK_BASE_URL: http://backend:8080
       # 支付回调 HMAC 密钥（下方默认值仅 local 演示；非 local/test 未替换会 fail-fast）
       PAYMENT_CALLBACK_SECRET: "${PAYMENT_CALLBACK_SECRET:-dev-local-only-pay-callback-secret-please-change-me}"
       ORDER_PAYMENT_TIMEOUT_MINUTES: "${ORDER_PAYMENT_TIMEOUT_MINUTES:-15}"

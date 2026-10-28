@@ -1,6 +1,6 @@
 {
   "name": "restaurant-mvp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "餐厅点餐系统 MVP（外卖 Web + 堂食微信小程序 UniApp + Spring Boot 3 后端 + MySQL/Redis/Nginx）——根仓库脚本入口",
   "engines": {

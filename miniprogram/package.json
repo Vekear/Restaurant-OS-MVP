@@ -1,6 +1,6 @@
 {
   "name": "restaurant-miniprogram",
-  "version": "0.1.0",
+  "version": "0.9.1",
   "private": true,
   "description": "餐厅点餐系统 - 堂食扫码点餐微信小程序（UniApp + Vue3 + JavaScript）",
   "scripts": {

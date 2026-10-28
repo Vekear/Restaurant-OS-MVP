@@ -1,6 +1,6 @@
 {
   "name": "restaurant-web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "拾味点餐 Web 端（顾客 / 商家 / 管理后台）· Vue 3 + JavaScript（禁止 TypeScript）",

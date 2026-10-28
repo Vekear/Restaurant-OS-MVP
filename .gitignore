@@ -44,3 +44,6 @@ desktop.ini
 
 # AgentTeams 运行态
 .agent-teams/
+
+# 本地文档：按作者要求不上传 docs/（README 使用 assets/screenshots/）
+docs/

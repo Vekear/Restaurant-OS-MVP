@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fffaf3"/>
+      <stop offset="1" stop-color="#f6efe4"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f04f2a"/>
+      <stop offset="1" stop-color="#ff8a3d"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#8a5a2b" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="760" fill="url(#bg)"/>
+  <text x="60" y="64" font-size="30" font-weight="700" fill="#2b1b12">餐厅点餐系统 · 四层架构</text>
+  <text x="60" y="96" font-size="15" fill="#8a6a54">Restaurant Ordering MVP — User / Gateway / Application / Data Layers</text>
+  <rect x="60" y="120" width="1080" height="4" rx="2" fill="url(#brand)" opacity="0.7"/>
+
+  <!-- User layer -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="150" width="1080" height="120" rx="16" fill="#ffffff"/>
+  </g>
+  <rect x="60" y="150" width="8" height="120" rx="4" fill="url(#brand)"/>
+  <text x="88" y="182" font-size="18" font-weight="700" fill="#2b1b12">用户层 <tspan fill="#b08a70" font-size="13" font-weight="500">User Layer</tspan></text>
+  <g font-size="14" fill="#3d2a1f">
+    <rect x="88" y="198" width="300" height="54" rx="10" fill="#fff4ea" stroke="#ffd9bf"/>
+    <text x="106" y="221" font-weight="700">Web 顾客端</text>
+    <text x="106" y="241" fill="#8a6a54" font-size="12">Vue 3 · Element Plus · ECharts</text>
+
+    <rect x="404" y="198" width="300" height="54" rx="10" fill="#fff4ea" stroke="#ffd9bf"/>
+    <text x="422" y="221" font-weight="700">Web 商家端 / 管理后台</text>
+    <text x="422" y="241" fill="#8a6a54" font-size="12">订单看板 · 报表 · 治理</text>
+
+    <rect x="720" y="198" width="300" height="54" rx="10" fill="#eef8f1" stroke="#bfe6cf"/>
+    <text x="738" y="221" font-weight="700">微信小程序（堂食扫码）</text>
+    <text x="738" y="241" fill="#5b7a63" font-size="12">UniApp · Vue 3 · JavaScript</text>
+  </g>
+
+  <!-- arrow -->
+  <g stroke="#c79a7c" stroke-width="2" fill="none">
+    <path d="M600 270 L600 300" marker-end="url(#arrow)"/>
+  </g>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#c79a7c"/>
+    </marker>
+  </defs>
+
+  <!-- Gateway layer -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="300" width="1080" height="96" rx="16" fill="#ffffff"/>
+  </g>
+  <rect x="60" y="300" width="8" height="96" rx="4" fill="#e9a23b"/>
+  <text x="88" y="332" font-size="18" font-weight="700" fill="#2b1b12">网关层 <tspan fill="#b08a70" font-size="13" font-weight="500">Gateway Layer</tspan></text>
+  <g font-size="13" fill="#3d2a1f">
+    <text x="92" y="362">Nginx 1.30</text>
+    <text x="230" y="362" font-size="12" fill="#8a6a54">静态托管 web/dist</text>
+    <text x="420" y="362" font-size="12" fill="#8a6a54">/api → 后端 · /files → 存储 · /ws → WebSocket Upgrade</text>
+    <text x="920" y="362" font-size="12" fill="#8a6a54">安全响应头 · SPA fallback</text>
+    <text x="92" y="382" font-size="12" fill="#8a6a54">Docker 版（backend:8080）与本地版（127.0.0.1:8080）双配置</text>
+  </g>
+
+  <path d="M600 396 L600 426" stroke="#c79a7c" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Application layer -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="426" width="1080" height="150" rx="16" fill="#ffffff"/>
+  </g>
+  <rect x="60" y="426" width="8" height="150" rx="4" fill="#d94f2b"/>
+  <text x="88" y="458" font-size="18" font-weight="700" fill="#2b1b12">应用层 <tspan fill="#b08a70" font-size="13" font-weight="500">Application Layer</tspan></text>
+  <text x="270" y="458" font-size="13" fill="#8a6a54">Spring Boot 3.5 · Java 17 · Spring MVC · Spring Security + JWT</text>
+  <g font-size="12" fill="#3d2a1f">
+    <rect x="88" y="474" width="196" height="36" rx="8" fill="#fbeee7"/>
+    <text x="100" y="497">双入口鉴权 / RBAC</text>
+    <rect x="296" y="474" width="196" height="36" rx="8" fill="#fbeee7"/>
+    <text x="308" y="497">订单状态机 · 桌台会话</text>
+    <rect x="504" y="474" width="196" height="36" rx="8" fill="#fbeee7"/>
+    <text x="516" y="497">模拟支付回调 / 幂等</text>
+    <rect x="712" y="474" width="196" height="36" rx="8" fill="#fbeee7"/>
+    <text x="724" y="497">库存 / 缓存 / Spring Task</text>
+    <rect x="920" y="474" width="196" height="36" rx="8" fill="#fbeee7"/>
+    <text x="932" y="497">WebSocket STOMP + ACL</text>
+
+    <rect x="88" y="518" width="290" height="36" rx="8" fill="#f3f7ff"/>
+    <text x="100" y="541">文件存储抽象（OSS 直传 / 本地兜底）</text>
+    <rect x="390" y="518" width="290" height="36" rx="8" fill="#f3f7ff"/>
+    <text x="402" y="541">POI 报表导出 · SpringDoc / OpenAPI</text>
+    <rect x="692" y="518" width="290" height="36" rx="8" fill="#f3f7ff"/>
+    <text x="704" y="541">审计日志 · 限流 · 统一异常 / traceId</text>
+  </g>
+
+  <path d="M600 576 L600 606" stroke="#c79a7c" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Data layer -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="606" width="1080" height="96" rx="16" fill="#ffffff"/>
+  </g>
+  <rect x="60" y="606" width="8" height="96" rx="4" fill="#3f7d5c"/>
+  <text x="88" y="638" font-size="18" font-weight="700" fill="#2b1b12">数据层 <tspan fill="#b08a70" font-size="13" font-weight="500">Data Layer</tspan></text>
+  <g font-size="13" fill="#3d2a1f">
+    <rect x="88" y="654" width="250" height="34" rx="8" fill="#eef8f1"/>
+    <text x="102" y="676">MySQL 8 · MyBatis-Plus · Flyway</text>
+    <rect x="354" y="654" width="250" height="34" rx="8" fill="#eef8f1"/>
+    <text x="368" y="676">Redis 缓存 / 会话 / 限流</text>
+    <rect x="620" y="654" width="250" height="34" rx="8" fill="#eef8f1"/>
+    <text x="634" y="676">阿里云 OSS · 本地文件适配器</text>
+    <rect x="886" y="654" width="230" height="34" rx="8" fill="#eef8f1"/>
+    <text x="900" y="676">微信 code2session（mock）</text>
+  </g>
+
+  <text x="60" y="740" font-size="12" fill="#9c806d">演示口径：订单金额真实展示，模拟支付实扣 ¥0.01；未配置 OSS 时使用 local 适配器；真实微信 / 支付网关在生产接入。</text>
+</svg>

@@ -100,7 +100,7 @@ restaurant-mvp/
 | [docs/04-testing.md](docs/04-testing.md) | 测试策略、用例与执行记录 |
 | [docs/05-security.md](docs/05-security.md) | 安全审查、修复状态与残余风险 |
 | [docs/06-deployment.md](docs/06-deployment.md) | 部署、环境变量、Nginx、验收与未验证清单 |
-| [docs/openapi.json](docs/openapi.json) | 由运行中后端导出的 OpenAPI 3.1 文档 |
+| [docs/openapi.json](docs/openapi.json) | 由运行中后端导出的 OpenAPI 3.1 文档（T74 快照：T72 `68064f1`，97 paths / 121 operations） |
 
 ---
 
@@ -394,7 +394,7 @@ npm run openapi:export
 # 生成 docs/openapi.json（UTF-8 无 BOM，需后端 /v3/api-docs 就绪）
 ```
 
-当前快照：OpenAPI `3.1.0`，**97 个 path**，由 T52 执行时 HEAD `d191302` 的 local profile 导出（文档声明 `info.version` 多为占位值；后续提交未纳入该快照）。重新导出后请与 `docs/02-api.md` 对照；工作区未提交的契约改动不包含在快照中。
+当前快照：OpenAPI `3.1.0`，**97 个 path / 121 个 operation / 15 个 tag**，由 T72 HEAD `68064f1` 的 local profile 真实导出（941,316 bytes，UTF-8 无 BOM；`nativePath` 与 `/ws/native` 均为 0）。与 `docs/02-api.md` 的 115 个端点逐条比对 **115/115 覆盖**，另有 6 个实现侧端点（文件上传/下载、xlsx 导出、堂食接单）不在契约端点表。重新导出后请与 `docs/02-api.md` 对照；工作区未提交的契约改动不包含在快照中。
 
 ---
 

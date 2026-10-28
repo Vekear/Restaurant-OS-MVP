@@ -209,6 +209,14 @@ app:
     # 低库存预警阈值（stock <= threshold 视为低库存）
     warn-threshold: ${STOCK_WARN_THRESHOLD:5}
 
+  address:
+    # 单用户地址数量上限
+    max-count: ${ADDRESS_MAX_COUNT:20}
+
+  cart:
+    # 购物车最大行数（不同菜品）
+    max-items: ${CART_MAX_ITEMS:50}
+
   wechat:
     # 无真实 AppID/Secret 时开启 mock，小程序登录走可用的降级通道
     mock: ${WECHAT_MOCK:true}

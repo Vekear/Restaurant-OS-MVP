@@ -158,8 +158,8 @@ class PaymentApiIntegrationTest {
 
         ResponseEntity<String> ok = callback(body, ts, usedNonce, signature);
         assertThat(ok.getStatusCode().value()).isEqualTo(200);
-        assertThat((Boolean) JsonPath.read(ok.getBody(), "$.received")).isTrue();
-        assertThat((String) JsonPath.read(ok.getBody(), "$.status")).isEqualTo("SUCCESS");
+        assertThat((Boolean) JsonPath.read(ok.getBody(), "$.data.received")).isTrue();
+        assertThat((String) JsonPath.read(ok.getBody(), "$.data.status")).isEqualTo("SUCCESS");
 
         ResponseEntity<String> detail = get("/api/v1/orders/" + orderId, customerToken);
         assertThat((String) JsonPath.read(detail.getBody(), "$.data.status")).isEqualTo("PAID");
@@ -176,7 +176,7 @@ class PaymentApiIntegrationTest {
                 appProperties.getPayment().getCallbackSecret(), ts + "\n" + retryNonce + "\n" + body);
         ResponseEntity<String> idempotent = callback(body, ts, retryNonce, retrySignature);
         assertThat(idempotent.getStatusCode().value()).isEqualTo(200);
-        assertThat((String) JsonPath.read(idempotent.getBody(), "$.status")).isEqualTo("SUCCESS");
+        assertThat((String) JsonPath.read(idempotent.getBody(), "$.data.status")).isEqualTo("SUCCESS");
     }
 
     @Test
@@ -197,7 +197,7 @@ class PaymentApiIntegrationTest {
                 appProperties.getPayment().getCallbackSecret(), ts + "\n" + usedNonce + "\n" + body);
         ResponseEntity<String> response = callback(body, ts, usedNonce, signature);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat((String) JsonPath.read(response.getBody(), "$.status")).isEqualTo("REFUNDED");
+        assertThat((String) JsonPath.read(response.getBody(), "$.data.status")).isEqualTo("REFUNDED");
 
         ResponseEntity<String> payment = get(PAYMENTS + "/" + payNo, customerToken);
         assertThat((String) JsonPath.read(payment.getBody(), "$.data.status")).isEqualTo("REFUNDED");

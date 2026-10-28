@@ -86,11 +86,11 @@ public class PaymentController {
     /** 模拟支付网关回调（Nginx 限源；HMAC 签名 + 时间戳 + nonce 防重放）。 */
     @PostMapping("/mock/callback")
     @Operation(summary = "模拟支付回调（内部）")
-    public PaymentCallbackResult callback(
+    public Result<PaymentCallbackResult> callback(
             @RequestBody String rawBody,
             @RequestHeader(value = "X-Pay-Timestamp", required = false) String timestamp,
             @RequestHeader(value = "X-Pay-Nonce", required = false) String nonce,
             @RequestHeader(value = "X-Pay-Signature", required = false) String signature) {
-        return paymentService.handleCallback(rawBody, timestamp, nonce, signature);
+        return Result.success(paymentService.handleCallback(rawBody, timestamp, nonce, signature));
     }
 }

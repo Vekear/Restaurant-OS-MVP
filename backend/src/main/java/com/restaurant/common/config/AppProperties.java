@@ -50,6 +50,10 @@ public class AppProperties {
 
     private final Report report = new Report();
 
+    private final Address address = new Address();
+
+    private final Cart cart = new Cart();
+
     private final Task task = new Task();
 
     /** 跨域配置（仅开发环境放行 Vite dev server）。 */
@@ -256,5 +260,21 @@ public class AppProperties {
 
         /** 低库存预警阈值（stock <= threshold 视为低库存）。 */
         private int warnThreshold = 5;
+    }
+
+    /** 收货地址配置。 */
+    @Data
+    public static class Address {
+
+        /** 单用户地址数量上限，对应 docs/01-architecture.md §16.9。 */
+        private int maxCount = 20;
+    }
+
+    /** 购物车配置。 */
+    @Data
+    public static class Cart {
+
+        /** 购物车最大行数（不同菜品），超出返回 40902。 */
+        private int maxItems = 50;
     }
 }

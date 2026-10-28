@@ -43,7 +43,7 @@ class FileStorageFacadeTest {
     private FileStorageFacade facade(AppProperties appProperties) {
         OssPostPolicyService policyService = new OssPostPolicyService(appProperties, new ObjectMapper());
         LocalFileStorage local = new LocalFileStorage(appProperties, null);
-        OssFileStorage oss = new OssFileStorage(appProperties, policyService, null);
+        OssFileStorage oss = new OssFileStorage(appProperties, policyService, null, null);
         FileStorageFacade facade = new FileStorageFacade(appProperties, local, policyService, oss);
         facade.initialize();
         return facade;

@@ -8,11 +8,14 @@ import com.restaurant.storage.dto.FileConfirmRequest;
 import com.restaurant.storage.mapper.FileObjectMapper;
 import com.restaurant.storage.vo.FileObjectView;
 import com.restaurant.storage.vo.FilePolicyView;
+import com.aliyun.oss.OSS;
+import com.aliyun.oss.model.ObjectMetadata;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.util.List;
 
 /**
@@ -30,6 +33,8 @@ public class OssFileStorage implements FileStorageService {
     private final OssPostPolicyService ossPostPolicyService;
 
     private final FileObjectMapper fileObjectMapper;
+
+    private final OssClientProvider ossClientProvider;
 
     @Override
     public String type() {
@@ -51,10 +56,71 @@ public class OssFileStorage implements FileStorageService {
         throw new BizException(ErrorCode.STORAGE_ERROR, "OSS 直传模式不支持后端上传，请先获取上传策略");
     }
 
+    /**
+     * 服务端生成文件（如桌台二维码 PNG）直接 putObject 到 OSS。
+     *
+     * <p>对象键规则与 local 保持一致：{@code {bizType}/yyyy/MM/{uuid}.{ext}}；写入成功后才登记
+     * file_object，登记失败会尽力删除刚上传的对象，避免产生孤儿文件。异常只暴露 objectKey 与
+     * 错误摘要，不输出 AccessKey。
+     */
     @Override
     public FileObjectView storeBytes(byte[] bytes, String contentType, String originalName,
                                      String bizType, Long uploaderId) {
-        throw new BizException(ErrorCode.STORAGE_ERROR, "OSS 直传模式不支持服务端生成文件");
+        String normalizedBizType = FileValidation.requireAnyBizType(bizType);
+        if (!ossPostPolicyService.configured()) {
+            throw new BizException(ErrorCode.STORAGE_ERROR, "OSS 未配置，已降级本地存储");
+        }
+        if (bytes == null || bytes.length == 0) {
+            throw new BizException(ErrorCode.FILE_INVALID, "文件内容不能为空");
+        }
+        long maxBytes = appProperties.getUpload().getMaxSize().toBytes();
+        if (bytes.length > maxBytes) {
+            throw new BizException(ErrorCode.FILE_INVALID, "文件不能超过 " + maxSizeMb() + "MB");
+        }
+        String normalizedType = FileValidation.normalizeContentType(contentType);
+        List<String> allowedTypes = allowedContentTypes();
+        if (!allowedTypes.contains(normalizedType)) {
+            throw new BizException(ErrorCode.FILE_INVALID, "仅支持 " + String.join("、", allowedTypes));
+        }
+        FileValidation.verifyMagicNumber(bytes, normalizedType);
+        String extension = FileValidation.extensionForContentType(normalizedType);
+        String objectKey = normalizedBizType + "/" + FileValidation.monthPath() + "/"
+                + FileValidation.uuid() + "." + extension;
+        AppProperties.Storage.Oss oss = appProperties.getStorage().getOss();
+        OSS client = null;
+        try {
+            client = ossClientProvider.createClient();
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(normalizedType);
+            metadata.setContentLength(bytes.length);
+            client.putObject(oss.getBucket(), objectKey,
+                    new ByteArrayInputStream(bytes), metadata);
+        } catch (RuntimeException e) {
+            log.warn("OSS 服务端上传失败, objectKey={}, error={}", objectKey, e.getMessage());
+            throw new BizException(ErrorCode.STORAGE_ERROR, "文件上传到 OSS 失败，请重试");
+        } finally {
+            shutdownQuietly(client);
+        }
+
+        FileObject fileObject = new FileObject();
+        fileObject.setBizType(normalizedBizType);
+        fileObject.setObjectKey(objectKey);
+        fileObject.setUrl(ossPostPolicyService.publicHost() + "/" + objectKey);
+        fileObject.setOriginalName(safeOriginalName(originalName));
+        fileObject.setContentType(normalizedType);
+        fileObject.setSize((long) bytes.length);
+        fileObject.setStorageType("oss");
+        fileObject.setUploaderId(uploaderId);
+        try {
+            fileObjectMapper.insert(fileObject);
+        } catch (RuntimeException e) {
+            deleteObjectQuietly(objectKey);
+            throw e;
+        }
+        log.info("OSS 文件已保存(服务端生成), objectKey={}, size={}", objectKey, bytes.length);
+        return new FileObjectView(fileObject.getId(), fileObject.getBizType(), fileObject.getObjectKey(),
+                fileObject.getUrl(), fileObject.getStorageType(), fileObject.getSize(),
+                fileObject.getContentType(), fileObject.getOriginalName(), fileObject.getCreatedAt());
     }
 
     @Override
@@ -100,6 +166,45 @@ public class OssFileStorage implements FileStorageService {
         return new FileObjectView(fileObject.getId(), fileObject.getBizType(), fileObject.getObjectKey(),
                 fileObject.getUrl(), fileObject.getStorageType(), fileObject.getSize(),
                 fileObject.getContentType(), fileObject.getOriginalName(), fileObject.getCreatedAt());
+    }
+
+    private void deleteObjectQuietly(String objectKey) {
+        OSS client = null;
+        try {
+            client = ossClientProvider.createClient();
+            client.deleteObject(appProperties.getStorage().getOss().getBucket(), objectKey);
+        } catch (RuntimeException e) {
+            log.warn("回滚 OSS 对象失败, objectKey={}, error={}", objectKey, e.getMessage());
+        } finally {
+            shutdownQuietly(client);
+        }
+    }
+
+    private void shutdownQuietly(OSS client) {
+        if (client == null) {
+            return;
+        }
+        try {
+            client.shutdown();
+        } catch (RuntimeException e) {
+            log.warn("关闭 OSS 客户端失败: {}", e.getMessage());
+        }
+    }
+
+    private String safeOriginalName(String originalName) {
+        if (originalName == null || originalName.isBlank()) {
+            return "file";
+        }
+        String normalized = originalName.replace('\\', '/');
+        int slash = normalized.lastIndexOf('/');
+        if (slash >= 0) {
+            normalized = normalized.substring(slash + 1);
+        }
+        normalized = normalized.trim();
+        if (normalized.isEmpty()) {
+            normalized = "file";
+        }
+        return normalized.length() > 120 ? normalized.substring(0, 120) : normalized;
     }
 
     private List<String> allowedContentTypes() {

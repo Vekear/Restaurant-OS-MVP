@@ -15,8 +15,13 @@ public interface CouponPort {
      */
     CouponUsage quote(Long userId, Long userCouponId, BigDecimal totalAmount);
 
-    /** 原子核销用户券（UNUSED → USED），失败抛 40912。 */
-    void consume(Long userCouponId, Long orderId);
+    /**
+     * 原子核销用户券（UNUSED → USED），失败抛 40912。
+     *
+     * <p>{@code userId} 必须是下单用户（认证上下文中的用户），用于在 SQL 层校验券归属；
+     * 传 null 会导致条件更新 0 行并按 40912 处理（T56 修复点）。
+     */
+    void consume(Long userId, Long userCouponId, Long orderId);
 
     /** 回补用户券（USED → UNUSED），订单取消/拒单时调用。 */
     void restore(Long userCouponId);

@@ -170,7 +170,8 @@ public class OrderService {
         }
 
         if (couponUsage.userCouponId() != null) {
-            couponPort.consume(couponUsage.userCouponId(), order.getId());
+            // userId 来自认证上下文（RoleGuard.currentUserId），核销时用于校验券归属（T56 修复：此前传 null）
+            couponPort.consume(userId, couponUsage.userCouponId(), order.getId());
         }
 
         OrderStatusLog statusLog = new OrderStatusLog();
@@ -272,7 +273,8 @@ public class OrderService {
         }
 
         if (couponUsage.userCouponId() != null) {
-            couponPort.consume(couponUsage.userCouponId(), order.getId());
+            // userId 来自认证上下文（RoleGuard.currentUserId），核销时用于校验券归属（T56 修复：此前传 null）
+            couponPort.consume(userId, couponUsage.userCouponId(), order.getId());
         }
 
         OrderStatusLog statusLog = new OrderStatusLog();

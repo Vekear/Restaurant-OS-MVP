@@ -46,13 +46,17 @@ public class CouponPortAdapter implements CouponPort {
     }
 
     @Override
-    public void consume(Long userCouponId, Long orderId) {
+    public void consume(Long userId, Long userCouponId, Long orderId) {
         if (userCouponId == null) {
             return;
         }
-        int rows = userCouponMapper.consume(userCouponId, null, orderId);
+        if (userId == null) {
+            // 防御：核销必须带下单用户，归属校验在 SQL 条件中完成（T56：此前固定传 null 导致必然 0 行）
+            throw new BizException(ErrorCode.COUPON_UNAVAILABLE, "优惠券不可用");
+        }
+        int rows = userCouponMapper.consume(userCouponId, userId, orderId);
         if (rows == 0) {
-            // userId 已在 quote 阶段校验；此处 0 行只可能是状态被并发改变
+            // 券不存在、不属于该用户、或状态被并发改变（重复核销）
             throw new BizException(ErrorCode.COUPON_UNAVAILABLE, "优惠券不可用");
         }
     }

@@ -93,6 +93,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
+      # 生产/预发必须改为 docker（或 prod）并注入四个强随机密钥；dev 仅用于本机演示
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-dev}"
       # --- 数据库（容器内主机名固定为 mysql）---
       DB_HOST: mysql
@@ -110,7 +111,7 @@ services:
       JWT_EXPIRES_IN_SECONDS: "${JWT_EXPIRES_IN_SECONDS:-7200}"
       TABLE_QR_SECRET: "${TABLE_QR_SECRET:-dev-only-table-qr-secret-please-change-me}"
       TABLE_QR_BASE_URL: "${TABLE_QR_BASE_URL:-http://localhost/t}"
-      # --- 文件存储（未配置 OSS 自动降级 local）---
+      # --- 文件存储：local 为默认；oss 必须配全五项，缺失时启动 fail-fast（不静默降级）---
       STORAGE_TYPE: "${STORAGE_TYPE:-local}"
       STORAGE_LOCAL_DIR: /app/storage
       STORAGE_LOCAL_URL_PREFIX: /files
@@ -119,8 +120,9 @@ services:
       OSS_BUCKET: "${OSS_BUCKET:-}"
       OSS_ACCESS_KEY_ID: "${OSS_ACCESS_KEY_ID:-}"
       OSS_ACCESS_KEY_SECRET: "${OSS_ACCESS_KEY_SECRET:-}"
+      OSS_PUBLIC_BASE_URL: "${OSS_PUBLIC_BASE_URL:-}"
       OSS_DIR: "${OSS_DIR:-restaurant/}"
-      OSS_SIGN_EXPIRE_SECONDS: "${OSS_SIGN_EXPIRE_SECONDS:-600}"
+      OSS_POST_EXPIRE_SECONDS: "${OSS_POST_EXPIRE_SECONDS:-300}"
       # --- 微信小程序登录（无真实凭证时 mock）---
       WECHAT_MOCK: "${WECHAT_MOCK:-true}"
       WECHAT_APP_ID: "${WECHAT_APP_ID:-}"
@@ -128,6 +130,8 @@ services:
       # --- 模拟支付 / 订单超时 ---
       PAYMENT_MOCK_CHARGE_AMOUNT: "${PAYMENT_MOCK_CHARGE_AMOUNT:-0.01}"
       PAYMENT_CALLBACK_BASE_URL: http://backend:8080
+      # 支付回调 HMAC 密钥（下方默认值仅 local 演示；非 local/test 未替换会 fail-fast）
+      PAYMENT_CALLBACK_SECRET: "${PAYMENT_CALLBACK_SECRET:-dev-local-only-pay-callback-secret-please-change-me}"
       ORDER_PAYMENT_TIMEOUT_MINUTES: "${ORDER_PAYMENT_TIMEOUT_MINUTES:-15}"
       TABLE_SESSION_IDLE_MINUTES: "${TABLE_SESSION_IDLE_MINUTES:-120}"
       # --- 跨域 / 日志 / JVM ---
